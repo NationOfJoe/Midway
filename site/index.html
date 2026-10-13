@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Midway for Android</title>
+<style>
+  :root {
+    --bg: #f6f7f5; --card: #ffffff; --text: #16201d; --muted: #5b6763;
+    --accent: #0f766e; --accent-text: #ffffff; --border: #dfe4e1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1412; --card: #18201d; --text: #e7ecea; --muted: #9aa7a2;
+      --accent: #2dd4bf; --accent-text: #062b27; --border: #2a3531;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 480px; margin: 0 auto; padding: 48px 16px; }
+  .logo {
+    width: 72px; height: 72px; border-radius: 18px; background: var(--accent);
+    color: var(--accent-text); display: grid; place-items: center;
+    font-size: 36px; font-weight: 700;
+  }
+  h1 { margin: 20px 0 4px; font-size: 28px; }
+  .meta { color: var(--muted); font-size: 14px; margin: 0 0 28px; }
+  .download {
+    display: block; text-align: center; text-decoration: none;
+    background: var(--accent); color: var(--accent-text);
+    font-weight: 600; font-size: 18px; padding: 16px; border-radius: 12px;
+  }
+  .card {
+    margin-top: 28px; background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px;
+  }
+  .card h2 { font-size: 16px; margin: 0 0 8px; }
+  ol { margin: 0; padding-left: 20px; }
+  li + li { margin-top: 6px; }
+  .note { color: var(--muted); font-size: 14px; margin-top: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="logo" aria-hidden="true">M</div>
+  <h1>Midway</h1>
+  <p class="meta">Version __VERSION__ · built __DATE__ · <code>__SHA__</code></p>
+
+  <a class="download" href="midway.apk" download="midway-__VERSION__.apk">Download APK</a>
+
+  <div class="card">
+    <h2>Install on Android</h2>
+    <ol>
+      <li>Tap <strong>Download APK</strong> above.</li>
+      <li>Open the downloaded file.</li>
+      <li>If Android blocks it, tap <strong>Settings</strong> and turn on
+          <strong>Allow from this source</strong>, then go back.</li>
+      <li>Tap <strong>Install</strong>. If Play Protect warns, choose
+          <strong>More details → Install anyway</strong>.</li>
+    </ol>
+    <p class="note">Requires Android 8.0 or newer. Installing a newer build over an
+      old one keeps your saved places and API key.</p>
+  </div>
+</main>
+</body>
+</html>
