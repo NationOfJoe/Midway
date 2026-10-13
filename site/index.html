@@ -33,6 +33,11 @@
     background: var(--accent); color: var(--accent-text);
     font-weight: 600; font-size: 18px; padding: 16px; border-radius: 12px;
   }
+  .secondary {
+    display: block; text-align: center; text-decoration: none; margin-top: 12px;
+    color: var(--accent); border: 1px solid var(--border); background: var(--card);
+    font-weight: 600; padding: 14px; border-radius: 12px;
+  }
   .card {
     margin-top: 28px; background: var(--card); border: 1px solid var(--border);
     border-radius: 12px; padding: 20px;
@@ -50,6 +55,7 @@
   <p class="meta">Version __VERSION__ · built __DATE__ · <code>__SHA__</code></p>
 
   <a class="download" href="midway.apk" download="midway-__VERSION__.apk">Download APK</a>
+  <a class="secondary" href="app/">Open in browser instead</a>
 
   <div class="card">
     <h2>Install on Android</h2>
