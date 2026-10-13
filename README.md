@@ -21,10 +21,12 @@ Open this folder, wait for Gradle sync, plug in your phone (USB debugging on) an
 ## API key
 
 Paste the key on first launch, or change it later in the Settings tab.
-If the key has *Website* restrictions, add this referrer:
+If the key has *Website* restrictions, add these referrers (the first is the
+Android app, the second the web version on GitHub Pages):
 
 ```
 https://appassets.androidplatform.net/*
+https://nationofjoe.github.io/Midway/*
 ```
 
 The key needs Maps JavaScript API, Places API (New) and Routes API enabled.
