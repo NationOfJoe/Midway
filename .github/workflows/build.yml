@@ -5,6 +5,13 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,3 +33,29 @@ jobs:
         with:
           name: midway-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+      - name: Assemble download page
+        run: |
+          version=$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' app/build.gradle.kts)
+          mkdir -p _site
+          cp app/build/outputs/apk/debug/app-debug.apk _site/midway.apk
+          sed -e "s/__VERSION__/${version}/g" \
+              -e "s/__DATE__/$(date -u +'%Y-%m-%d %H:%M UTC')/g" \
+              -e "s/__SHA__/${GITHUB_SHA::7}/g" \
+              site/index.html > _site/index.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
