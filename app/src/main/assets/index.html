@@ -1,0 +1,1202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Midway</title>
+<meta name="theme-color" content="#0f766e">
+<style>
+  :root {
+    --bg: #f6f7f5;
+    --surface: #ffffff;
+    --surface-2: #eef1ee;
+    --text: #18201d;
+    --muted: #5d6a64;
+    --border: #d9dfdb;
+    --accent: #0f766e;
+    --accent-ink: #ffffff;
+    --a: #2563eb;
+    --b: #db2777;
+    --good: #15803d;
+    --warn: #b45309;
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(0,0,0,.05), 0 4px 16px rgba(0,0,0,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1412;
+      --surface: #171e1b;
+      --surface-2: #1f2824;
+      --text: #e8eeeb;
+      --muted: #94a39c;
+      --border: #2b3632;
+      --accent: #2dd4bf;
+      --accent-ink: #062320;
+      --a: #60a5fa;
+      --b: #f472b6;
+      --good: #4ade80;
+      --warn: #fbbf24;
+      --shadow: 0 1px 2px rgba(0,0,0,.4);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .app { display: grid; grid-template-columns: 400px 1fr; height: 100dvh; }
+  .panel { overflow-y: auto; padding: 18px 16px 32px; border-right: 1px solid var(--border); }
+  #map { width: 100%; height: 100%; background: var(--surface-2); }
+  @media (max-width: 820px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: auto 45dvh; height: auto; }
+    .panel { border-right: 0; order: 1; }
+    #map { order: 0; height: 45dvh; position: sticky; top: 0; z-index: 1; }
+  }
+  h1 { font-size: 22px; margin: 0 0 2px; letter-spacing: -.01em; }
+  .tag { color: var(--muted); margin: 0 0 16px; font-size: 14px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px; margin-bottom: 12px; box-shadow: var(--shadow); }
+  .who { display: flex; align-items: center; gap: 8px; font-weight: 600; margin-bottom: 8px; }
+  .dot { width: 22px; height: 22px; border-radius: 50%; color: #fff; display: grid; place-items: center;
+    font-size: 12px; font-weight: 700; flex: none; }
+  .dot.a { background: var(--a); } .dot.b { background: var(--b); }
+  .picked { font-size: 13px; color: var(--muted); margin-top: 6px; min-height: 18px; }
+  .picked.ok { color: var(--good); }
+  .seg { display: flex; background: var(--surface-2); border-radius: 10px; padding: 3px; margin-top: 10px; }
+  .seg button { flex: 1; border: 0; background: transparent; color: var(--muted); padding: 8px; border-radius: 8px;
+    font: inherit; font-weight: 600; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+  label.lbl { display: block; font-size: 13px; color: var(--muted); margin: 0 0 6px; font-weight: 600; }
+  input[type=text], input[type=datetime-local], input[type=password] {
+    width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); font: inherit; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip { border: 1px solid var(--border); background: var(--surface-2); color: var(--text); border-radius: 999px;
+    padding: 4px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+  .linkbtn { border: 0; background: none; color: var(--accent); font: inherit; font-size: 13px; padding: 0; cursor: pointer; margin-top: 6px; }
+  .go { width: 100%; padding: 14px; border: 0; border-radius: 12px; background: var(--accent); color: var(--accent-ink);
+    font: inherit; font-weight: 700; font-size: 16px; cursor: pointer; margin-top: 4px; }
+  .go:disabled { opacity: .5; cursor: default; }
+  .status { font-size: 14px; color: var(--muted); margin: 12px 2px; min-height: 20px; }
+  .status.err { color: #dc2626; }
+  .result { display: block; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px; cursor: pointer; color: var(--text); font: inherit; }
+  .result.best { border-color: var(--accent); border-width: 2px; }
+  .result .name { font-weight: 700; display: flex; gap: 8px; align-items: baseline; }
+  .result .rank { color: var(--muted); font-weight: 600; font-size: 13px; }
+  .result .addr { font-size: 13px; color: var(--muted); margin: 2px 0 8px; }
+  .times { display: flex; gap: 14px; flex-wrap: wrap; font-size: 14px; }
+  .times span { display: inline-flex; align-items: center; gap: 6px; }
+  .times .dot { width: 16px; height: 16px; font-size: 10px; }
+  .gap { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .gap.fair { color: var(--good); }
+  .dirs { display: flex; gap: 12px; margin-top: 8px; font-size: 13px; }
+  .dirs a { color: var(--accent); text-decoration: none; font-weight: 600; }
+  .keybox { max-width: 460px; margin: 12vh auto; padding: 0 16px; }
+  .keybox p { color: var(--muted); font-size: 14px; }
+  .keybox code { background: var(--surface-2); padding: 1px 5px; border-radius: 5px; font-size: 13px; }
+  .hidden { display: none !important; }
+  gmp-place-autocomplete { width: 100%; }
+  .name-input { flex: 1; min-width: 0; border: 0; border-bottom: 1px dashed transparent; background: transparent;
+    color: var(--text); font: inherit; font-weight: 600; padding: 2px 0; }
+  .name-input:hover { border-bottom-color: var(--border); }
+  .name-input:focus { outline: none; border-bottom-color: var(--accent); }
+  .who .edit { color: var(--muted); font-size: 12px; font-weight: 400; }
+  .card-actions { display: flex; gap: 14px; align-items: center; }
+  .saved { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .saved:empty { display: none; }
+  .saved .chip { display: inline-flex; align-items: center; gap: 4px; }
+  .saved .chip .x { border: 0; background: none; color: var(--muted); font: inherit; padding: 0 0 0 2px; cursor: pointer; line-height: 1; }
+  .saved .chip.active { border-color: var(--accent); color: var(--accent); }
+  .park { font-size: 13px; margin-top: 6px; color: var(--text); }
+  .park .p { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 4px;
+    background: #1d4ed8; color: #fff; font-size: 11px; font-weight: 700; margin-right: 6px; vertical-align: -2px; }
+  .park .muted { color: var(--muted); }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: 0 0 14px; }
+  .tabs button { border: 0; background: none; color: var(--muted); font: inherit; font-weight: 600; padding: 10px 12px;
+    border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer; }
+  .tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+  select { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); font: inherit; }
+  .lbl.sub { font-weight: 500; font-size: 12px; }
+  .unit { display: flex; align-items: center; gap: 8px; }
+  .unit input { width: 70px; padding: 10px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); font: inherit; }
+  .unit span { font-size: 13px; color: var(--muted); }
+  .tier { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-left: auto; white-space: nowrap; }
+  .tier.ideal { background: color-mix(in srgb, var(--good) 15%, transparent); color: var(--good); }
+  .tier.ok { background: color-mix(in srgb, var(--warn) 15%, transparent); color: var(--warn); }
+  .pairline { font-size: 14px; margin-top: 6px; }
+  .pairline .icon { margin-right: 6px; }
+  .pairline .muted, .muted { color: var(--muted); }
+  .extra { font-size: 12px; color: var(--muted); margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<!-- API key screen -->
+<div id="keyScreen" class="keybox hidden">
+  <h1>Midway</h1>
+  <p class="tag">Find a meeting spot that's fair in travel time, not distance.</p>
+  <div class="card">
+    <label class="lbl" for="keyInput">Google Maps API key</label>
+    <input id="keyInput" type="password" placeholder="AIza…" autocomplete="off">
+    <p>Enable <code>Maps JavaScript API</code>, <code>Places API (New)</code> and <code>Routes API</code> on the key's project. The key is kept only in this browser.</p>
+    <button class="go" id="keySave">Start</button>
+  </div>
+</div>
+
+<!-- Main app -->
+<div id="appScreen" class="app hidden">
+  <div class="panel">
+    <h1>Midway</h1>
+    <p class="tag" id="tagline">Fair by travel time, not by distance.</p>
+
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tabBtnMeet" aria-selected="true" data-tab="Meet">Meet halfway</button>
+      <button role="tab" id="tabBtnPair" aria-selected="false" data-tab="Pair">Nearby pair</button>
+      <button role="tab" id="tabBtnSettings" aria-selected="false" data-tab="Settings" style="margin-left:auto" aria-label="Settings">⚙ Settings</button>
+    </div>
+
+    <section id="tabMeet">
+    <div class="card" id="cardA">
+      <div class="who"><span class="dot a" id="dotA">A</span>
+        <input class="name-input" id="nameA" value="Person A" maxlength="24" aria-label="Name for person A">
+        <span class="edit">✎</span></div>
+      <div id="acA"></div>
+      <div class="saved" id="savedA"></div>
+      <div class="card-actions">
+        <button class="linkbtn" id="locA">Use my location</button>
+        <button class="linkbtn hidden" id="saveA">☆ Save this place</button>
+      </div>
+      <div class="picked" id="pickedA"></div>
+      <div class="seg" role="group" aria-label="Person A travel mode">
+        <button data-p="A" data-m="TRANSIT" aria-pressed="true">Public transport</button>
+        <button data-p="A" data-m="DRIVING" aria-pressed="false">Car</button>
+      </div>
+    </div>
+
+    <div class="card" id="cardB">
+      <div class="who"><span class="dot b" id="dotB">B</span>
+        <input class="name-input" id="nameB" value="Person B" maxlength="24" aria-label="Name for person B">
+        <span class="edit">✎</span></div>
+      <div id="acB"></div>
+      <div class="saved" id="savedB"></div>
+      <div class="card-actions">
+        <button class="linkbtn" id="locB">Use my location</button>
+        <button class="linkbtn hidden" id="saveB">☆ Save this place</button>
+      </div>
+      <div class="picked" id="pickedB"></div>
+      <div class="seg" role="group" aria-label="Person B travel mode">
+        <button data-p="B" data-m="TRANSIT" aria-pressed="true">Public transport</button>
+        <button data-p="B" data-m="DRIVING" aria-pressed="false">Car</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <label class="lbl" for="venue">Meet at</label>
+      <input id="venue" type="text" placeholder="pub, coffee, ramen, park…" value="pub">
+      <div class="chips">
+        <button class="chip" data-v="pub">Pub</button>
+        <button class="chip" data-v="coffee shop">Coffee</button>
+        <button class="chip" data-v="restaurant">Restaurant</button>
+        <button class="chip" data-v="train station">Station</button>
+        <button class="chip" data-v="park">Park</button>
+      </div>
+      <div style="margin-top:12px">
+        <label class="lbl" for="when">Leaving at (optional)</label>
+        <input id="when" type="datetime-local">
+      </div>
+    </div>
+
+    <button class="go" id="goBtn">Find the fair middle</button>
+    <div class="status" id="status"></div>
+    <div id="results"></div>
+    </section>
+
+    <section id="tabPair" class="hidden">
+      <div class="seg" role="group" aria-label="Pair mode" style="margin:0 0 12px">
+        <button data-pm="both" aria-pressed="true">Find both</button>
+        <button data-pm="anchor" aria-pressed="false">I have a place</button>
+      </div>
+
+      <!-- Find both -->
+      <div id="pairBoth">
+        <div class="card">
+          <label class="lbl" for="kindMain">Main place</label>
+          <input id="kindMain" type="text" placeholder="hotel, restaurant…" value="hotel">
+          <div class="chips" data-target="kindMain"></div>
+          <label class="lbl" for="kindNear" style="margin-top:12px">With a … nearby</label>
+          <input id="kindNear" type="text" placeholder="EV charger, parking…" value="EV charger">
+          <div class="chips" data-target="kindNear"></div>
+          <button class="linkbtn" id="swapKinds">⇅ Swap</button>
+        </div>
+        <div class="card">
+          <label class="lbl">Where</label>
+          <div id="acArea"></div>
+          <div class="saved" id="savedArea"></div>
+          <div class="card-actions"><button class="linkbtn" id="locArea">Use my location</button></div>
+          <div class="picked" id="pickedArea"></div>
+          <label class="lbl" for="areaRadius" style="margin-top:10px">Search within</label>
+          <select id="areaRadius">
+            <option value="1000">1 km</option>
+            <option value="3000" selected>3 km</option>
+            <option value="5000">5 km</option>
+            <option value="10000">10 km</option>
+            <option value="25000">25 km</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- I have a place -->
+      <div id="pairAnchor" class="hidden">
+        <div class="card">
+          <label class="lbl">My place</label>
+          <div id="acAnchor"></div>
+          <div class="saved" id="savedAnchor"></div>
+          <div class="card-actions"><button class="linkbtn" id="locAnchor">Use my location</button></div>
+          <div class="picked" id="pickedAnchor"></div>
+          <label class="lbl" for="kindFind" style="margin-top:12px">Find a … nearby</label>
+          <input id="kindFind" type="text" placeholder="EV charger, restaurant…" value="EV charger">
+          <div class="chips" data-target="kindFind"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <label class="lbl">"Nearby" means</label>
+        <div class="row">
+          <div>
+            <label class="lbl sub" for="walkIdeal">Ideal, up to</label>
+            <div class="unit"><input id="walkIdeal" type="number" min="1" max="30" value="5"><span>min walk</span></div>
+          </div>
+          <div>
+            <label class="lbl sub" for="walkMax">Also show up to</label>
+            <div class="unit"><input id="walkMax" type="number" min="1" max="30" value="10"><span>min walk</span></div>
+          </div>
+        </div>
+      </div>
+
+      <button class="go" id="pairBtn">Find pairs</button>
+      <div class="status" id="pairStatus"></div>
+      <div id="pairResults"></div>
+    </section>
+
+    <section id="tabSettings" class="hidden">
+      <div class="card">
+        <label class="lbl" for="setKeyInput">Google Maps API key</label>
+        <div class="unit">
+          <input id="setKeyInput" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…" style="flex:1;width:auto">
+          <button class="linkbtn" id="setKeyShow" style="margin:0">Show</button>
+        </div>
+        <div class="picked" id="setKeyHint"></div>
+        <button class="go" id="setKeySave">Save & reload</button>
+        <div class="card-actions" style="margin-top:10px">
+          <button class="linkbtn" id="setKeyRemove">Remove key</button>
+        </div>
+        <p class="extra" style="margin-top:12px">The key needs <b>Maps JavaScript API</b>, <b>Places API (New)</b> and <b>Routes API</b> enabled.
+          Manage it in <a href="https://console.cloud.google.com/google/maps-apis/credentials" target="_blank" rel="noopener" style="color:var(--accent)">Google Cloud credentials</a>.
+          Changing it reloads the page, because Google Maps can only load once per page.</p>
+      </div>
+
+      <div class="card">
+        <label class="lbl">Saved data</label>
+        <div class="extra" id="setDataInfo" style="margin:0 0 8px"></div>
+        <div class="card-actions">
+          <button class="linkbtn" id="setClearSaved">Clear saved places</button>
+          <button class="linkbtn" id="setResetAll" style="color:#dc2626">Reset everything</button>
+        </div>
+      </div>
+      <div class="status" id="settingsStatus"></div>
+    </section>
+  </div>
+  <div id="map"></div>
+</div>
+
+<script>
+/* ---------- key handling ---------- */
+const KEY_STORE = 'midway.apiKey';
+function getKey() { try { return localStorage.getItem(KEY_STORE); } catch { return null; } }
+function setKey(k) { try { localStorage.setItem(KEY_STORE, k); } catch {} }
+function clearKey() { try { localStorage.removeItem(KEY_STORE); } catch {} }
+
+const $ = (id) => document.getElementById(id);
+
+function loadMaps(key) {
+  // Google's official dynamic bootstrap loader
+  (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({ key, v: "weekly" });
+}
+
+// Google calls this if the key is rejected
+window.gm_authFailure = () => {
+  const msg = 'Google rejected this API key. Check the key and that the three APIs are enabled, then save it again in Settings.';
+  setStatus(msg, true);
+  try {
+    $('settingsStatus').textContent = msg; $('settingsStatus').classList.add('err');
+    $('appScreen').classList.remove('hidden');
+    setTab('Settings');
+  } catch {}
+};
+
+/* ---------- state ---------- */
+const state = {
+  A: { loc: null, label: '', mode: 'TRANSIT', name: 'Person A' },
+  B: { loc: null, label: '', mode: 'TRANSIT', name: 'Person B' },
+};
+let G = {};            // loaded library classes
+let map, markers = [], infoWin, parkMarker = null;
+
+/* ---------- local persistence (names, modes, last picks, saved places) ---------- */
+const PREFS = 'midway.prefs', SAVED = 'midway.saved';
+function loadJSON(k, def) { try { return JSON.parse(localStorage.getItem(k)) ?? def; } catch { return def; } }
+function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+function savePrefs() {
+  const pick = (p) => ({ name: state[p].name, mode: state[p].mode, loc: state[p].loc, label: state[p].label });
+  saveJSON(PREFS, { A: pick('A'), B: pick('B') });
+}
+let savedPlaces = loadJSON(SAVED, []);   // [{ id, label, address, lat, lng }]
+
+const nameOf = (p) => state[p].name.trim() || `Person ${p}`;
+const initial = (p) => (nameOf(p).match(/\p{L}|\d/u)?.[0] || p).toUpperCase();
+function refreshNames() {
+  for (const p of ['A', 'B']) {
+    $('dot' + p).textContent = initial(p);
+    if (state['origin' + p]) state['origin' + p].title = nameOf(p);
+  }
+}
+
+const sameLoc = (a, b) => a && b && Math.abs(a.lat - b.lat) < 1e-6 && Math.abs(a.lng - b.lng) < 1e-6;
+const savedLabel = (s) => `${s.label}${s.address ? ' · ' + s.address : ''}`;
+// Every place-picker that shows saved chips: { box id, current location getter, pick handler }
+const savedTargets = [
+  { box: 'savedA', loc: () => state.A.loc, pick: (s) => setOrigin('A', { lat: s.lat, lng: s.lng }, savedLabel(s)) },
+  { box: 'savedB', loc: () => state.B.loc, pick: (s) => setOrigin('B', { lat: s.lat, lng: s.lng }, savedLabel(s)) },
+  { box: 'savedArea', loc: () => pair.area?.loc, pick: (s) => setPairLoc('area', { lat: s.lat, lng: s.lng }, savedLabel(s)) },
+  { box: 'savedAnchor', loc: () => pair.anchor?.loc, pick: (s) => setPairLoc('anchor', { lat: s.lat, lng: s.lng }, savedLabel(s)) },
+];
+
+function renderSaved() {
+  for (const t of savedTargets) {
+    const box = $(t.box);
+    box.innerHTML = '';
+    for (const s of savedPlaces) {
+      const chip = document.createElement('span');
+      chip.className = 'chip' + (sameLoc(t.loc(), s) ? ' active' : '');
+      chip.title = s.address || '';
+      const pick = document.createElement('button');
+      pick.className = 'x'; pick.style.color = 'inherit'; pick.style.padding = '0';
+      pick.textContent = '★ ' + s.label;
+      pick.addEventListener('click', () => t.pick(s));
+      const del = document.createElement('button');
+      del.className = 'x'; del.textContent = '×'; del.setAttribute('aria-label', `Remove ${s.label}`);
+      del.addEventListener('click', () => {
+        savedPlaces = savedPlaces.filter((x) => x.id !== s.id);
+        saveJSON(SAVED, savedPlaces); renderSaved();
+      });
+      chip.append(pick, del);
+      box.appendChild(chip);
+    }
+  }
+}
+
+function saveCurrent(p) {
+  const s = state[p];
+  if (!s.loc) return;
+  const suggested = s.label === 'Current location' ? `${nameOf(p)}'s place` : s.label.split(' · ')[0];
+  const label = (prompt('Name this place (e.g. Home, Work)', suggested) || '').trim();
+  if (!label) return;
+  savedPlaces = savedPlaces.filter((x) => x.label.toLowerCase() !== label.toLowerCase());
+  savedPlaces.push({ id: Date.now().toString(36), label: label.slice(0, 24), address: s.label === 'Current location' ? '' : s.label, lat: s.loc.lat, lng: s.loc.lng });
+  saveJSON(SAVED, savedPlaces); renderSaved();
+}
+
+function setMode(p, m) {
+  state[p].mode = m;
+  document.querySelectorAll(`.seg button[data-p="${p}"]`).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.m === m)));
+  savePrefs();
+}
+
+/* ---------- parking ---------- */
+async function findParking(ll) {
+  try {
+    const { places } = await G.Place.searchNearby({
+      fields: ['id', 'displayName', 'location', 'formattedAddress'],
+      locationRestriction: { center: ll, radius: 1000 },
+      includedTypes: ['parking'],
+      maxResultCount: 5,
+      rankPreference: G.RankDistance,
+    });
+    const pk = (places || []).find((x) => x.location);
+    if (!pk) return null;
+    const pll = { lat: pk.location.lat(), lng: pk.location.lng() };
+    const metres = haversine(ll, pll) * 1.3;           // straight line → rough walking distance
+    return { id: pk.id, name: pk.displayName, ll: pll, metres, walkMin: Math.max(1, Math.round(metres / 80)) };
+  } catch (e) { console.warn('Parking search failed', e); return null; }
+}
+
+function setStatus(msg, err = false) {
+  const s = $('status'); s.textContent = msg; s.classList.toggle('err', err);
+}
+
+/* ---------- geometry helpers ---------- */
+const R = 6371000;
+const toRad = (d) => d * Math.PI / 180;
+function haversine(p, q) {
+  const dLat = toRad(q.lat - p.lat), dLng = toRad(q.lng - p.lng);
+  const s = Math.sin(dLat/2)**2 + Math.cos(toRad(p.lat))*Math.cos(toRad(q.lat))*Math.sin(dLng/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+// Local flat projection around the midpoint (fine at city/region scale)
+function project(origin) {
+  const kx = 111320 * Math.cos(toRad(origin.lat)), ky = 110540;
+  return {
+    toXY: (p) => ({ x: (p.lng - origin.lng) * kx, y: (p.lat - origin.lat) * ky }),
+    toLL: (v) => ({ lat: origin.lat + v.y / ky, lng: origin.lng + v.x / kx }),
+  };
+}
+
+/* ---------- scoring ---------- */
+// Lower is better: the longer journey, plus half the imbalance between the two.
+const score = (ta, tb) => Math.max(ta, tb) + 0.5 * Math.abs(ta - tb);
+const fmtMin = (ms) => {
+  const m = Math.round(ms / 60000);
+  return m < 60 ? `${m} min` : `${Math.floor(m/60)}h ${String(m%60).padStart(2,'0')}m`;
+};
+
+/* ---------- routing ---------- */
+function departure() {
+  const v = $('when').value;
+  if (!v) return null;
+  const d = new Date(v);
+  return d > new Date() ? d : null;
+}
+
+async function timesFrom(person, destinations) {
+  // One origin -> many destinations, in that person's mode. Returns array of ms (or null).
+  const out = new Array(destinations.length).fill(null);
+  const chunk = person.mode === 'TRANSIT' ? 100 : 600;
+  for (let i = 0; i < destinations.length; i += chunk) {
+    const slice = destinations.slice(i, i + chunk);
+    const req = {
+      origins: [person.loc],
+      destinations: slice,
+      travelMode: person.mode,
+      fields: person.mode === 'TRANSIT'
+        ? ['durationMillis', 'condition', 'travelAdvisory']
+        : ['durationMillis', 'condition'],
+    };
+    const dep = departure();
+    if (dep) {
+      req.departureTime = dep;
+      if (person.mode === 'DRIVING') req.routingPreference = 'TRAFFIC_AWARE';
+    }
+    const { matrix } = await G.RouteMatrix.computeRouteMatrix(req);
+    const items = matrix?.rows?.[0]?.items || [];
+    items.forEach((it, j) => {
+      if (it && it.condition === 'ROUTE_EXISTS' && it.durationMillis != null) {
+        out[i + j] = Number(it.durationMillis);
+      }
+    });
+  }
+  return out;
+}
+
+/* ---------- the search ---------- */
+async function findMiddle() {
+  const { A, B } = state;
+  if (!A.loc || !B.loc) { setStatus('Pick both starting points first.', true); return; }
+  const query = $('venue').value.trim() || 'cafe';
+  $('goBtn').disabled = true;
+  $('results').innerHTML = '';
+  clearMarkers();
+
+  try {
+    const D = haversine(A.loc, B.loc);
+    const mid = { lat: (A.loc.lat + B.loc.lat) / 2, lng: (A.loc.lng + B.loc.lng) / 2 };
+    const P = project(mid);
+    const a = P.toXY(A.loc), b = P.toXY(B.loc);
+    const dir = { x: (b.x - a.x) / (D || 1), y: (b.y - a.y) / (D || 1) };
+    const perp = { x: -dir.y, y: dir.x };
+
+    // Stage 1: probe a grid across the corridor between A and B.
+    setStatus('Mapping travel times across the area…');
+    const grid = [];
+    const along = [0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85];
+    const across = [-0.3, -0.15, 0, 0.15, 0.3];
+    for (const t of along) for (const s of across) {
+      grid.push(P.toLL({
+        x: a.x + (b.x - a.x) * t + perp.x * s * D,
+        y: a.y + (b.y - a.y) * t + perp.y * s * D,
+      }));
+    }
+    const [gA, gB] = await Promise.all([timesFrom(A, grid), timesFrom(B, grid)]);
+    const scoredGrid = grid
+      .map((p, i) => ({ p, ta: gA[i], tb: gB[i] }))
+      .filter((g) => g.ta != null && g.tb != null)
+      .map((g) => ({ ...g, s: score(g.ta, g.tb) }))
+      .sort((x, y) => x.s - y.s);
+    if (!scoredGrid.length) throw new Error('No routes found between these places in the chosen modes.');
+
+    // Keep the best 3 hotspots that aren't on top of each other.
+    const minSep = D * 0.12;
+    const hotspots = [];
+    for (const g of scoredGrid) {
+      if (hotspots.every((h) => haversine(h.p, g.p) > minSep)) hotspots.push(g);
+      if (hotspots.length === 3) break;
+    }
+
+    // Stage 2: find real venues around each hotspot.
+    setStatus(`Looking for "${query}" near the fairest spots…`);
+    const radius = Math.min(15000, Math.max(800, D * 0.08));
+    const seen = new Map();
+    const searches = await Promise.all(hotspots.map((h) =>
+      G.Place.searchByText({
+        textQuery: query,
+        fields: ['id', 'displayName', 'location', 'formattedAddress', 'rating', 'userRatingCount'],
+        locationBias: { center: h.p, radius },
+        maxResultCount: 15,
+      }).catch(() => ({ places: [] }))
+    ));
+    for (const { places } of searches) {
+      for (const pl of places || []) {
+        if (pl.location && !seen.has(pl.id)) seen.set(pl.id, pl);
+      }
+    }
+    const venues = [...seen.values()].slice(0, 45);
+    if (!venues.length) throw new Error(`Couldn't find any "${query}" near the middle. Try a broader type.`);
+
+    // Stage 3: real journey times to each venue, then rank.
+    setStatus(`Checking journey times to ${venues.length} places…`);
+    const dests = venues.map((v) => ({ lat: v.location.lat(), lng: v.location.lng() }));
+    const [vA, vB] = await Promise.all([timesFrom(A, dests), timesFrom(B, dests)]);
+    const ranked = venues
+      .map((v, i) => ({ v, ll: dests[i], ta: vA[i], tb: vB[i] }))
+      .filter((r) => r.ta != null && r.tb != null)
+      .map((r) => ({ ...r, s: score(r.ta, r.tb) }))
+      .sort((x, y) => x.s - y.s)
+      .slice(0, 8);
+    if (!ranked.length) throw new Error('Found places, but no routes to them. Try different modes or a time.');
+
+    // Stage 4: nearest parking for anyone driving.
+    if (A.mode === 'DRIVING' || B.mode === 'DRIVING') {
+      setStatus('Finding parking near each place…');
+      await Promise.all(ranked.map(async (r) => { r.parking = await findParking(r.ll); }));
+    }
+
+    render(ranked);
+    setStatus(`Best ${ranked.length} of ${venues.length} places, ranked by fairness.`);
+  } catch (e) {
+    console.error(e);
+    setStatus(e.message || 'Something went wrong. Check the console for details.', true);
+  } finally {
+    $('goBtn').disabled = false;
+  }
+}
+
+/* ---------- rendering ---------- */
+function dirLink(person, r) {
+  const u = new URL('https://www.google.com/maps/dir/');
+  u.searchParams.set('api', '1');
+  u.searchParams.set('origin', `${person.loc.lat},${person.loc.lng}`);
+  // Drivers are routed to the car park, everyone else to the venue.
+  const target = person.mode === 'DRIVING' && r.parking
+    ? { name: r.parking.name, ll: r.parking.ll, id: r.parking.id }
+    : { name: r.v.displayName, ll: r.ll, id: r.v.id };
+  u.searchParams.set('destination', target.name || `${target.ll.lat},${target.ll.lng}`);
+  u.searchParams.set('destination_place_id', target.id);
+  u.searchParams.set('travelmode', person.mode === 'TRANSIT' ? 'transit' : 'driving');
+  return u.toString();
+}
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function render(ranked) {
+  const box = $('results');
+  box.innerHTML = '';
+  const bounds = new G.LatLngBounds();
+  bounds.extend(state.A.loc); bounds.extend(state.B.loc);
+
+  ranked.forEach((r, i) => {
+    const diff = Math.abs(r.ta - r.tb);
+    const el = document.createElement('div');
+    el.className = 'result' + (i === 0 ? ' best' : '');
+    el.tabIndex = 0;
+    el.innerHTML = `
+      <div class="name"><span class="rank">#${i + 1}</span>${esc(r.v.displayName)}</div>
+      <div class="addr">${esc(r.v.formattedAddress)}${r.v.rating ? ` · ★ ${r.v.rating} (${r.v.userRatingCount ?? 0})` : ''}</div>
+      <div class="times">
+        <span><span class="dot a">${esc(initial('A'))}</span>${esc(nameOf('A'))}: ${fmtMin(r.ta)} ${state.A.mode === 'TRANSIT' ? 'by transit' : 'by car'}</span>
+        <span><span class="dot b">${esc(initial('B'))}</span>${esc(nameOf('B'))}: ${fmtMin(r.tb)} ${state.B.mode === 'TRANSIT' ? 'by transit' : 'by car'}</span>
+      </div>
+      <div class="gap ${diff < 5 * 60000 ? 'fair' : ''}">${diff < 60000 ? 'Dead even' : `${fmtMin(diff)} difference`}</div>
+      ${parkingLine(r)}
+      <div class="dirs">
+        <a href="${dirLink(state.A, r)}" target="_blank" rel="noopener">${esc(nameOf('A'))}'s directions</a>
+        <a href="${dirLink(state.B, r)}" target="_blank" rel="noopener">${esc(nameOf('B'))}'s directions</a>
+      </div>`;
+    el.addEventListener('click', (ev) => {
+      if (ev.target.closest('a')) return;
+      map.panTo(r.ll); map.setZoom(15);
+      openInfo(r, marker);
+      showParking(r);
+    });
+    box.appendChild(el);
+
+    const pin = new G.PinElement({
+      glyphText: String(i + 1),
+      background: i === 0 ? '#0f766e' : '#475569',
+      borderColor: '#ffffff', glyphColor: '#ffffff',
+      scale: i === 0 ? 1.2 : 1,
+    });
+    const marker = new G.AdvancedMarkerElement({
+      map, position: r.ll, title: r.v.displayName, content: pin.element || pin, zIndex: 100 - i,
+    });
+    marker.addListener('click', () => { openInfo(r, marker); showParking(r); });
+    markers.push(marker);
+    bounds.extend(r.ll);
+  });
+  map.fitBounds(bounds, 60);
+  showParking(ranked[0]);
+}
+
+function parkingLine(r) {
+  const drivers = ['A', 'B'].filter((p) => state[p].mode === 'DRIVING');
+  if (!drivers.length) return '';
+  if (!r.parking) return `<div class="park"><span class="p">P</span><span class="muted">No parking found within 1 km</span></div>`;
+  return `<div class="park"><span class="p">P</span>${esc(r.parking.name)} <span class="muted">· ~${r.parking.walkMin} min walk (${Math.round(r.parking.metres / 10) * 10} m)</span></div>`;
+}
+
+function showParking(r) {
+  if (parkMarker) { parkMarker.map = null; parkMarker = null; }
+  if (!r?.parking) return;
+  const pin = new G.PinElement({ glyphText: 'P', background: '#1d4ed8', borderColor: '#ffffff', glyphColor: '#ffffff', scale: 0.85 });
+  parkMarker = new G.AdvancedMarkerElement({ map, position: r.parking.ll, content: pin.element || pin, title: `Parking: ${r.parking.name}`, zIndex: 50 });
+}
+
+function openInfo(r, marker) {
+  const park = r.parking ? `<br>🅿 ${esc(r.parking.name)} (~${r.parking.walkMin} min walk)` : '';
+  infoWin.setContent(`<div style="color:#111;font:14px system-ui"><b>${esc(r.v.displayName)}</b><br>${esc(nameOf('A'))}: ${fmtMin(r.ta)} · ${esc(nameOf('B'))}: ${fmtMin(r.tb)}${park}</div>`);
+  infoWin.open({ map, anchor: marker });
+}
+
+function clearMarkers() {
+  markers.forEach((m) => (m.map = null)); markers = [];
+  if (parkMarker) { parkMarker.map = null; parkMarker = null; }
+}
+
+function placeOrigin(p) {
+  const key = 'origin' + p;
+  if (state[key]) state[key].map = null;
+  if (!state[p].loc) return;
+  const pin = new G.PinElement({
+    glyphText: initial(p), background: p === 'A' ? '#2563eb' : '#db2777',
+    borderColor: '#ffffff', glyphColor: '#ffffff',
+  });
+  state[key] = new G.AdvancedMarkerElement({ map, position: state[p].loc, content: pin.element || pin, title: nameOf(p) });
+  if (state.A.loc && state.B.loc) {
+    const b = new G.LatLngBounds(); b.extend(state.A.loc); b.extend(state.B.loc); map.fitBounds(b, 60);
+  } else map.panTo(state[p].loc);
+}
+
+function setOrigin(p, loc, label) {
+  state[p].loc = loc; state[p].label = label;
+  const el = $('picked' + p);
+  el.textContent = '✓ ' + label; el.classList.add('ok');
+  $('save' + p).classList.remove('hidden');
+  placeOrigin(p);
+  renderSaved();
+  savePrefs();
+}
+
+/* =====================================================================
+   NEARBY PAIR TAB
+   ===================================================================== */
+const pair = { mode: 'both', area: null, anchor: null, markers: [], lines: [] };
+
+// Known kinds use a precise Google place type; anything else falls back to free-text search.
+const KINDS = [
+  { key: 'ev', label: 'EV charger', type: 'electric_vehicle_charging_station', icon: '⚡', match: /\b(ev|charg|electric)/i },
+  { key: 'hotel', label: 'Hotel', type: 'lodging', icon: '🛏', match: /hotel|lodg|b&b|inn\b|hostel/i },
+  { key: 'restaurant', label: 'Restaurant', type: 'restaurant', icon: '🍽', match: /restaurant|dinner|food/i },
+  { key: 'cafe', label: 'Café', type: 'cafe', icon: '☕', match: /caf[eé]|coffee/i },
+  { key: 'parking', label: 'Parking', type: 'parking', icon: '🅿', match: /park(ing)?\b|car ?park/i },
+  { key: 'supermarket', label: 'Supermarket', type: 'supermarket', icon: '🛒', match: /supermarket|grocer/i },
+];
+const kindOf = (text) => {
+  const t = text.trim();
+  return KINDS.find((k) => k.label.toLowerCase() === t.toLowerCase()) || KINDS.find((k) => k.match.test(t))
+    || { key: 'text', label: t, type: null, icon: '📍' };
+};
+const isEV = (kind) => kind.key === 'ev';
+
+function pairSetStatus(msg, err = false) {
+  const s = $('pairStatus'); s.textContent = msg; s.classList.toggle('err', err);
+}
+
+function setPairLoc(which, loc, label) {
+  pair[which] = { loc, label };
+  const el = $(which === 'area' ? 'pickedArea' : 'pickedAnchor');
+  el.textContent = '✓ ' + label; el.classList.add('ok');
+  renderSaved();
+  clearPairMarkers();
+  const pin = new G.PinElement({ glyphText: '◎', background: '#334155', borderColor: '#fff', glyphColor: '#fff' });
+  pair.markers.push(new G.AdvancedMarkerElement({ map, position: loc, content: pin.element || pin, title: label }));
+  map.panTo(loc); map.setZoom(which === 'area' ? 13 : 15);
+}
+
+function walkSettings() {
+  let ideal = Math.max(1, Math.min(30, Number($('walkIdeal').value) || 5));
+  let max = Math.max(1, Math.min(30, Number($('walkMax').value) || 10));
+  if (max < ideal) max = ideal;
+  $('walkIdeal').value = ideal; $('walkMax').value = max;
+  return { ideal, max };
+}
+
+// Search for a kind of place around a point. Returns [{ id, name, address, rating, count, ll, ev }]
+async function searchKind(kind, center, radius, max) {
+  const fields = ['id', 'displayName', 'location', 'formattedAddress', 'rating', 'userRatingCount'];
+  if (isEV(kind)) fields.push('evChargeOptions');
+  let places = [];
+  if (kind.type) {
+    ({ places } = await G.Place.searchNearby({
+      fields,
+      locationRestriction: { center, radius: Math.min(50000, radius) },
+      includedTypes: [kind.type],
+      maxResultCount: Math.min(20, max),
+    }));
+  } else {
+    ({ places } = await G.Place.searchByText({
+      textQuery: kind.label, fields,
+      locationBias: { center, radius: Math.min(50000, radius) },
+      maxResultCount: Math.min(20, max),
+    }));
+  }
+  return (places || []).filter((p) => p.location).map((p) => ({
+    id: p.id, name: p.displayName, address: p.formattedAddress,
+    rating: p.rating, count: p.userRatingCount,
+    ll: { lat: p.location.lat(), lng: p.location.lng() },
+    ev: p.evChargeOptions || null,
+  })).filter((p) => haversine(center, p.ll) <= radius * 1.05);   // text search only biases, so trim strays
+}
+
+// Real walking times (ms) from one point to many.
+async function walkTimes(origin, dests) {
+  if (!dests.length) return [];
+  const out = new Array(dests.length).fill(null);
+  for (let i = 0; i < dests.length; i += 600) {
+    const slice = dests.slice(i, i + 600);
+    const { matrix } = await G.RouteMatrix.computeRouteMatrix({
+      origins: [origin], destinations: slice, travelMode: 'WALKING',
+      fields: ['durationMillis', 'distanceMeters', 'condition'],
+    });
+    (matrix?.rows?.[0]?.items || []).forEach((it, j) => {
+      if (it && it.condition === 'ROUTE_EXISTS' && it.durationMillis != null) {
+        out[i + j] = { ms: Number(it.durationMillis), m: Number(it.distanceMeters ?? 0) };
+      }
+    });
+  }
+  return out;
+}
+
+// For one place, find walkable neighbours of `kind`, sorted by walk time, within max minutes.
+async function neighbours(origin, kind, maxMin, excludeId) {
+  const radius = maxMin * 100;    // generous straight-line radius (~6 km/h), real walk times filter after
+  const cands = (await searchKind(kind, origin, radius, 20)).filter((c) => c.id !== excludeId);
+  const times = await walkTimes(origin, cands.map((c) => c.ll));
+  return cands
+    .map((c, i) => ({ ...c, walk: times[i] }))
+    .filter((c) => c.walk && c.walk.ms <= maxMin * 60000)
+    .sort((a, b) => a.walk.ms - b.walk.ms);
+}
+
+function evSummary(ev) {
+  if (!ev) return '';
+  const parts = [];
+  if (ev.connectorCount) parts.push(`${ev.connectorCount} connector${ev.connectorCount > 1 ? 's' : ''}`);
+  const kw = Math.max(0, ...(ev.connectorAggregations || []).map((a) => Number(a.maxChargeRateKw) || 0));
+  if (kw) parts.push(`up to ${Math.round(kw)} kW`);
+  return parts.join(' · ');
+}
+
+async function findPairs() {
+  const { ideal, max } = walkSettings();
+  $('pairResults').innerHTML = '';
+  clearPairMarkers(true);
+  $('pairBtn').disabled = true;
+  try {
+    if (pair.mode === 'anchor') {
+      if (!pair.anchor) throw new Error('Pick your place first.');
+      const kind = kindOf($('kindFind').value || 'EV charger');
+      pairSetStatus(`Looking for ${kind.label.toLowerCase()} within ${max} min walk…`);
+      const found = await neighbours(pair.anchor.loc, kind, max);
+      if (!found.length) throw new Error(`No ${kind.label.toLowerCase()} within a ${max} min walk.`);
+      renderAnchorResults(found, kind, ideal);
+      pairSetStatus(`${found.length} found · ${found.filter((f) => f.walk.ms <= ideal * 60000).length} within ${ideal} min.`);
+    } else {
+      if (!pair.area) throw new Error('Pick where to search first.');
+      const kMain = kindOf($('kindMain').value || 'hotel');
+      const kNear = kindOf($('kindNear').value || 'EV charger');
+      const radius = Number($('areaRadius').value) || 3000;
+      pairSetStatus(`Finding ${kMain.label.toLowerCase()}s in the area…`);
+      const mains = (await searchKind(kMain, pair.area.loc, radius, 20)).slice(0, 12);
+      if (!mains.length) throw new Error(`No ${kMain.label.toLowerCase()} found there. Try a bigger area.`);
+      pairSetStatus(`Checking what's within ${max} min walk of ${mains.length} ${kMain.label.toLowerCase()}s…`);
+      const withNear = await Promise.all(mains.map(async (m) => {
+        try { return { ...m, near: await neighbours(m.ll, kNear, max, m.id) }; }
+        catch (e) { console.warn(e); return { ...m, near: [] }; }
+      }));
+      const hits = withNear.filter((m) => m.near.length)
+        .sort((a, b) => a.near[0].walk.ms - b.near[0].walk.ms || (b.rating || 0) - (a.rating || 0));
+      if (!hits.length) throw new Error(`None of the ${mains.length} ${kMain.label.toLowerCase()}s has a ${kNear.label.toLowerCase()} within ${max} min walk.`);
+      renderBothResults(hits, kMain, kNear, ideal);
+      const idealCount = hits.filter((h) => h.near[0].walk.ms <= ideal * 60000).length;
+      pairSetStatus(`${hits.length} of ${mains.length} ${kMain.label.toLowerCase()}s qualify · ${idealCount} within ${ideal} min.`);
+    }
+  } catch (e) {
+    console.error(e);
+    pairSetStatus(e.message || 'Something went wrong. Check the console.', true);
+  } finally {
+    $('pairBtn').disabled = false;
+  }
+}
+
+/* ---------- pair rendering ---------- */
+const mapsLink = (p) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name || `${p.ll.lat},${p.ll.lng}`)}&query_place_id=${encodeURIComponent(p.id)}`;
+const walkLink = (from, to) => {
+  const u = new URL('https://www.google.com/maps/dir/');
+  u.searchParams.set('api', '1');
+  u.searchParams.set('origin', `${from.ll.lat},${from.ll.lng}`);
+  u.searchParams.set('destination', to.name || `${to.ll.lat},${to.ll.lng}`);
+  u.searchParams.set('destination_place_id', to.id);
+  u.searchParams.set('travelmode', 'walking');
+  return u.toString();
+};
+const tierBadge = (ms, ideal) => ms <= ideal * 60000
+  ? `<span class="tier ideal">≤ ${ideal} min</span>` : `<span class="tier ok">${fmtMin(ms)} walk</span>`;
+const ratingTxt = (p) => p.rating ? ` · ★ ${p.rating} (${p.count ?? 0})` : '';
+
+function pairPin(ll, title, glyph, bg, scale = 1, z = 10) {
+  const pin = new G.PinElement({ glyphText: glyph, background: bg, borderColor: '#fff', glyphColor: '#fff', scale });
+  const m = new G.AdvancedMarkerElement({ map, position: ll, content: pin.element || pin, title, zIndex: z });
+  pair.markers.push(m);
+  return m;
+}
+function pairLine(a, b, ideal) {
+  pair.lines.push(new G.Polyline({ map, path: [a, b], strokeColor: ideal ? '#15803d' : '#b45309', strokeOpacity: 0.85, strokeWeight: 3 }));
+}
+function clearPairMarkers(keepOrigin = false) {
+  const keep = keepOrigin ? pair.markers.slice(0, 1) : [];
+  pair.markers.slice(keep.length).forEach((m) => (m.map = null));
+  pair.markers = keep;
+  pair.lines.forEach((l) => l.setMap(null)); pair.lines = [];
+}
+
+function renderBothResults(hits, kMain, kNear, ideal) {
+  const box = $('pairResults');
+  const bounds = new G.LatLngBounds(); bounds.extend(pair.area.loc);
+  hits.forEach((h, i) => {
+    const best = h.near[0];
+    const isIdeal = best.walk.ms <= ideal * 60000;
+    const evTxt = isEV(kNear) ? evSummary(best.ev) : '';
+    const more = h.near.length - 1;
+    const el = document.createElement('div');
+    el.className = 'result' + (i === 0 ? ' best' : '');
+    el.innerHTML = `
+      <div class="name"><span class="rank">#${i + 1}</span>${esc(kMain.icon)} ${esc(h.name)}${tierBadge(best.walk.ms, ideal)}</div>
+      <div class="addr">${esc(h.address)}${ratingTxt(h)}</div>
+      <div class="pairline"><span class="icon">${esc(kNear.icon)}</span>${esc(best.name)}
+        <span class="muted">· ${fmtMin(best.walk.ms)} walk (${Math.round(best.walk.m / 10) * 10} m)</span></div>
+      ${evTxt ? `<div class="extra">${esc(evTxt)}</div>` : ''}
+      ${more ? `<div class="extra">+${more} more ${esc(kNear.label.toLowerCase())}${more > 1 ? 's' : ''} within ${walkSettings().max} min: ${h.near.slice(1, 4).map((n) => `${esc(n.name)} (${fmtMin(n.walk.ms)})`).join(', ')}${more > 3 ? '…' : ''}</div>` : ''}
+      <div class="dirs">
+        <a href="${mapsLink(h)}" target="_blank" rel="noopener">Open ${esc(kMain.label.toLowerCase())}</a>
+        <a href="${walkLink(h, best)}" target="_blank" rel="noopener">Walking route</a>
+      </div>`;
+    el.addEventListener('click', (ev) => {
+      if (ev.target.closest('a')) return;
+      const b = new G.LatLngBounds(); b.extend(h.ll); b.extend(best.ll); map.fitBounds(b, 80);
+    });
+    box.appendChild(el);
+    pairPin(h.ll, h.name, String(i + 1), i === 0 ? '#0f766e' : '#475569', i === 0 ? 1.15 : 1, 100 - i);
+    pairPin(best.ll, best.name, kNear.icon, isIdeal ? '#15803d' : '#b45309', 0.8, 50);
+    pairLine(h.ll, best.ll, isIdeal);
+    bounds.extend(h.ll); bounds.extend(best.ll);
+  });
+  map.fitBounds(bounds, 60);
+}
+
+function renderAnchorResults(found, kind, ideal) {
+  const box = $('pairResults');
+  const a = { ll: pair.anchor.loc, name: pair.anchor.label, id: '' };
+  const bounds = new G.LatLngBounds(); bounds.extend(a.ll);
+  found.slice(0, 15).forEach((f, i) => {
+    const isIdeal = f.walk.ms <= ideal * 60000;
+    const evTxt = isEV(kind) ? evSummary(f.ev) : '';
+    const el = document.createElement('div');
+    el.className = 'result' + (i === 0 ? ' best' : '');
+    el.innerHTML = `
+      <div class="name"><span class="rank">#${i + 1}</span>${esc(kind.icon)} ${esc(f.name)}${tierBadge(f.walk.ms, ideal)}</div>
+      <div class="addr">${esc(f.address)}${ratingTxt(f)}</div>
+      <div class="pairline muted">${fmtMin(f.walk.ms)} walk · ${Math.round(f.walk.m / 10) * 10} m</div>
+      ${evTxt ? `<div class="extra">${esc(evTxt)}</div>` : ''}
+      <div class="dirs">
+        <a href="${mapsLink(f)}" target="_blank" rel="noopener">Open in Maps</a>
+        <a href="${walkLink(a, f)}" target="_blank" rel="noopener">Walking route</a>
+      </div>`;
+    el.addEventListener('click', (ev) => {
+      if (ev.target.closest('a')) return;
+      const b = new G.LatLngBounds(); b.extend(a.ll); b.extend(f.ll); map.fitBounds(b, 80);
+    });
+    box.appendChild(el);
+    pairPin(f.ll, f.name, String(i + 1), isIdeal ? '#15803d' : '#b45309', i === 0 ? 1.1 : 0.9, 100 - i);
+    pairLine(a.ll, f.ll, isIdeal);
+    bounds.extend(f.ll);
+  });
+  map.fitBounds(bounds, 60);
+}
+
+function setPairMode(m) {
+  pair.mode = m;
+  document.querySelectorAll('[data-pm]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.pm === m)));
+  $('pairBoth').classList.toggle('hidden', m !== 'both');
+  $('pairAnchor').classList.toggle('hidden', m !== 'anchor');
+  $('pairResults').innerHTML = ''; pairSetStatus('');
+  clearPairMarkers();
+  const cur = m === 'both' ? pair.area : pair.anchor;
+  if (cur) setPairLoc(m === 'both' ? 'area' : 'anchor', cur.loc, cur.label);
+}
+
+function setTab(t) {
+  if (!['Meet', 'Pair', 'Settings'].includes(t)) t = 'Meet';
+  for (const x of ['Meet', 'Pair', 'Settings']) {
+    $('tab' + x).classList.toggle('hidden', x !== t);
+    $('tabBtn' + x).setAttribute('aria-selected', String(x === t));
+  }
+  $('tagline').textContent = {
+    Meet: 'Fair by travel time, not by distance.',
+    Pair: 'Two kinds of place, a short walk apart.',
+    Settings: 'Your key and data, kept in this browser.',
+  }[t];
+  if (t === 'Settings') { refreshSettings(); return; }   // leave the map as it was; don't remember Settings as last tab
+  // Each tab owns the map while it's showing.
+  const meetOn = t === 'Meet';
+  markers.forEach((m) => (m.map = meetOn ? map : null));
+  for (const p of ['A', 'B']) if (state['origin' + p]) state['origin' + p].map = meetOn ? map : null;
+  if (parkMarker) parkMarker.map = meetOn ? map : null;
+  pair.markers.forEach((m) => (m.map = meetOn ? null : map));
+  pair.lines.forEach((l) => l.setMap(meetOn ? null : map));
+  try { localStorage.setItem('midway.tab', t); } catch {}
+}
+
+function initPairTab(PlaceAutocompleteElement) {
+  // Kind chips under each kind input
+  document.querySelectorAll('#tabPair .chips[data-target]').forEach((box) => {
+    for (const k of KINDS) {
+      const c = document.createElement('button');
+      c.className = 'chip'; c.textContent = `${k.icon} ${k.label}`;
+      c.addEventListener('click', () => { $(box.dataset.target).value = k.label; savePairPrefs(); });
+      box.appendChild(c);
+    }
+  });
+  $('swapKinds').addEventListener('click', () => {
+    const a = $('kindMain').value; $('kindMain').value = $('kindNear').value; $('kindNear').value = a; savePairPrefs();
+  });
+
+  for (const [which, acId, locId] of [['area', 'acArea', 'locArea'], ['anchor', 'acAnchor', 'locAnchor']]) {
+    const ac = new PlaceAutocompleteElement({});
+    ac.placeholder = which === 'area' ? 'A town, neighbourhood or address' : 'Your hotel, restaurant, address…';
+    $(acId).appendChild(ac);
+    ac.addEventListener('gmp-select', async ({ placePrediction }) => {
+      const place = placePrediction.toPlace();
+      await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] });
+      setPairLoc(which, { lat: place.location.lat(), lng: place.location.lng() }, place.displayName || place.formattedAddress);
+    });
+    $(locId).addEventListener('click', () => {
+      if (!navigator.geolocation) return pairSetStatus('Location not available in this browser.', true);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setPairLoc(which, { lat: pos.coords.latitude, lng: pos.coords.longitude }, 'Current location'),
+        () => pairSetStatus("Couldn't get your location.", true),
+        { enableHighAccuracy: true, timeout: 10000 });
+    });
+  }
+
+  document.querySelectorAll('[data-pm]').forEach((b) => b.addEventListener('click', () => setPairMode(b.dataset.pm)));
+  document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
+  $('pairBtn').addEventListener('click', findPairs);
+
+  // Restore settings
+  const pp = loadJSON('midway.pair', {});
+  for (const id of ['kindMain', 'kindNear', 'kindFind', 'walkIdeal', 'walkMax', 'areaRadius']) {
+    if (pp[id] != null) $(id).value = pp[id];
+    $(id).addEventListener('change', savePairPrefs);
+  }
+  let tab = 'Meet'; try { tab = localStorage.getItem('midway.tab') || 'Meet'; } catch {}
+  setTab(tab);
+}
+function savePairPrefs() {
+  const v = {};
+  for (const id of ['kindMain', 'kindNear', 'kindFind', 'walkIdeal', 'walkMax', 'areaRadius']) v[id] = $(id).value;
+  saveJSON('midway.pair', v);
+}
+
+/* =====================================================================
+   SETTINGS TAB
+   ===================================================================== */
+const maskKey = (k) => (k && k.length > 10 ? `${k.slice(0, 4)}…${k.slice(-4)}` : k ? 'set' : 'none');
+
+function settingsMsg(msg, err = false) {
+  const s = $('settingsStatus'); s.textContent = msg; s.classList.toggle('err', err);
+}
+
+function refreshSettings() {
+  const k = getKey();
+  $('setKeyInput').value = k || '';
+  $('setKeyInput').type = 'password'; $('setKeyShow').textContent = 'Show';
+  $('setKeyHint').textContent = k ? `Current key: ${maskKey(k)}` : 'No key saved.';
+  $('setKeyHint').classList.toggle('ok', !!k);
+  const n = savedPlaces.length;
+  $('setDataInfo').textContent = `${n} saved place${n === 1 ? '' : 's'}${n ? ': ' + savedPlaces.map((s) => s.label).join(', ') : ''}. Names, travel modes and search settings are also remembered.`;
+}
+
+let settingsReady = false;
+function initSettings() {
+  if (settingsReady) return;
+  settingsReady = true;
+  $('setKeyShow').addEventListener('click', () => {
+    const inp = $('setKeyInput');
+    const show = inp.type === 'password';
+    inp.type = show ? 'text' : 'password';
+    $('setKeyShow').textContent = show ? 'Hide' : 'Show';
+  });
+  $('setKeySave').addEventListener('click', () => {
+    const k = $('setKeyInput').value.trim();
+    if (!k) return settingsMsg('Paste a key first.', true);
+    if (!/^AIza[\w-]{30,}$/.test(k) && !confirm("That doesn't look like a Google Maps key (they usually start with AIza). Save it anyway?")) return;
+    if (k === getKey()) return settingsMsg('That key is already saved.');
+    setKey(k);
+    settingsMsg('Saved. Reloading…');
+    setTimeout(() => location.reload(), 300);
+  });
+  $('setKeyInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('setKeySave').click(); });
+  $('setKeyRemove').addEventListener('click', () => {
+    if (!confirm('Remove the API key from this browser? You will need to paste it again to use the app.')) return;
+    clearKey(); location.reload();
+  });
+  $('setClearSaved').addEventListener('click', () => {
+    if (!savedPlaces.length) return settingsMsg('No saved places to clear.');
+    if (!confirm(`Delete all ${savedPlaces.length} saved places?`)) return;
+    savedPlaces = []; saveJSON(SAVED, savedPlaces); renderSaved(); refreshSettings();
+    settingsMsg('Saved places cleared.');
+  });
+  $('setResetAll').addEventListener('click', () => {
+    if (!confirm('Reset everything? This removes your API key, saved places, names and settings from this browser.')) return;
+    try { Object.keys(localStorage).filter((k) => k.startsWith('midway.')).forEach((k) => localStorage.removeItem(k)); } catch {}
+    location.reload();
+  });
+}
+
+/* ---------- init ---------- */
+async function initApp() {
+  $('appScreen').classList.remove('hidden');
+  const [{ Map, InfoWindow, Polyline }, places, marker, routes, core] = await Promise.all([
+    google.maps.importLibrary('maps'),
+    google.maps.importLibrary('places'),
+    google.maps.importLibrary('marker'),
+    google.maps.importLibrary('routes'),
+    google.maps.importLibrary('core'),
+  ]);
+  G = {
+    Place: places.Place,
+    PlaceAutocompleteElement: places.PlaceAutocompleteElement,
+    AdvancedMarkerElement: marker.AdvancedMarkerElement,
+    PinElement: marker.PinElement,
+    RouteMatrix: routes.RouteMatrix,
+    LatLngBounds: core.LatLngBounds,
+    RankDistance: places.SearchNearbyRankPreference?.DISTANCE ?? 'DISTANCE',
+    Polyline,
+  };
+
+  map = new Map($('map'), {
+    center: { lat: 51.5072, lng: -0.1276 }, zoom: 10,
+    mapId: 'DEMO_MAP_ID', disableDefaultUI: true, zoomControl: true,
+    colorScheme: 'FOLLOW_SYSTEM',
+  });
+  infoWin = new InfoWindow();
+
+  for (const p of ['A', 'B']) {
+    const ac = new G.PlaceAutocompleteElement({});
+    ac.placeholder = p === 'A' ? 'Where is A starting?' : 'Where is B starting?';
+    $('ac' + p).appendChild(ac);
+    ac.addEventListener('gmp-select', async ({ placePrediction }) => {
+      const place = placePrediction.toPlace();
+      await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] });
+      setOrigin(p, { lat: place.location.lat(), lng: place.location.lng() },
+        place.displayName || place.formattedAddress);
+    });
+
+    $('loc' + p).addEventListener('click', () => {
+      if (!navigator.geolocation) return setStatus('Location not available in this browser.', true);
+      $('picked' + p).textContent = 'Finding you…';
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setOrigin(p, { lat: pos.coords.latitude, lng: pos.coords.longitude }, 'Current location'),
+        () => { $('picked' + p).textContent = ''; setStatus("Couldn't get your location.", true); },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    });
+  }
+
+  document.querySelectorAll('.seg button').forEach((btn) => {
+    btn.addEventListener('click', () => setMode(btn.dataset.p, btn.dataset.m));
+  });
+
+  // Names, saved places, and last session
+  const prefs = loadJSON(PREFS, {});
+  for (const p of ['A', 'B']) {
+    const input = $('name' + p);
+    if (prefs[p]?.name) { state[p].name = prefs[p].name; input.value = prefs[p].name; }
+    input.addEventListener('input', () => { state[p].name = input.value; refreshNames(); savePrefs(); });
+    input.addEventListener('blur', () => { if (!input.value.trim()) { input.value = state[p].name = `Person ${p}`; refreshNames(); savePrefs(); } });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+    input.parentElement.querySelector('.edit').addEventListener('click', () => { input.focus(); input.select(); });
+    $('save' + p).addEventListener('click', () => saveCurrent(p));
+    if (prefs[p]?.mode) setMode(p, prefs[p].mode);
+    if (prefs[p]?.loc) setOrigin(p, prefs[p].loc, prefs[p].label || 'Last used');
+  }
+  refreshNames();
+  renderSaved();
+  initPairTab(G.PlaceAutocompleteElement);
+  document.querySelectorAll('#tabMeet .chip[data-v]').forEach((c) =>
+    c.addEventListener('click', () => { $('venue').value = c.dataset.v; }));
+  $('goBtn').addEventListener('click', findMiddle);
+  initSettings();
+}
+
+// If Maps fails to load, still let the user reach Settings to fix the key.
+function loadFailed(e) {
+  console.error(e);
+  $('appScreen').classList.remove('hidden');
+  if (!settingsReady) {
+    initSettings();
+    document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
+  }
+  setTab('Settings');
+  settingsMsg('Could not load Google Maps: ' + (e?.message || e) + '. Check the key below.', true);
+}
+
+(function boot() {
+  const key = getKey();
+  if (key) {
+    loadMaps(key);
+    initApp().catch(loadFailed);
+  } else {
+    $('keyScreen').classList.remove('hidden');
+    $('keySave').addEventListener('click', () => {
+      const k = $('keyInput').value.trim();
+      if (!k) return;
+      setKey(k);
+      $('keyScreen').classList.add('hidden');
+      loadMaps(k);
+      initApp().catch(loadFailed);
+    });
+  }
+})();
+</script>
+</body>
+</html>

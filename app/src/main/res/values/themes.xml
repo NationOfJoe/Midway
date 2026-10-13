@@ -1,0 +1,10 @@
+<resources>
+    <!-- DayNight makes the page's prefers-color-scheme follow the phone's dark mode -->
+    <style name="Theme.Midway" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/midway_teal</item>
+        <item name="colorAccent">@color/midway_teal</item>
+        <item name="android:windowBackground">@color/window_bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>
