@@ -36,7 +36,7 @@ import androidx.webkit.WebViewClientCompat
  *
  * The page is served from https://appassets.androidplatform.net/assets/ (not file://), so it gets a
  * secure origin: localStorage, geolocation and the Google Maps JS API all work normally. If your API
- * key has website restrictions, allow https://appassets.androidplatform.net/* as a referrer.
+ * key has website restrictions, allow https://appassets.androidplatform.net/ (any path) as a referrer.
  */
 class MainActivity : AppCompatActivity() {
 
