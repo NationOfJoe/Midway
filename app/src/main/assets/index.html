@@ -314,7 +314,16 @@
 <script>
 /* ---------- key handling ---------- */
 const KEY_STORE = 'midway.apiKey';
-function getKey() { try { return localStorage.getItem(KEY_STORE); } catch { return null; } }
+/* A site can offer a shared key (and a searches allowance) by adding
+   <meta name="midway-shared-key" content="AIza…"> and
+   <meta name="midway-quota-url" content="/path/to/quota.cgi"> to the page.
+   A key the visitor saves in Settings always takes priority and has no allowance. */
+const metaContent = (n) => document.querySelector(`meta[name="${n}"]`)?.content?.trim() || null;
+const SHARED_KEY = metaContent('midway-shared-key');
+const QUOTA_URL = metaContent('midway-quota-url');
+function ownKey() { try { return localStorage.getItem(KEY_STORE); } catch { return null; } }
+function getKey() { return ownKey() || SHARED_KEY; }
+function usingShared() { return !ownKey() && !!SHARED_KEY; }
 function setKey(k) { try { localStorage.setItem(KEY_STORE, k); } catch {} }
 function clearKey() { try { localStorage.removeItem(KEY_STORE); } catch {} }
 
@@ -346,7 +355,9 @@ function loadMaps(key) {
 
 // Google calls this if the key is rejected
 window.gm_authFailure = () => {
-  const msg = 'Google rejected this API key. Check the key and that the three APIs are enabled, then save it again in Settings.';
+  const msg = usingShared()
+    ? "The shared key isn't working right now. You can add your own Google Maps key in Settings."
+    : 'Google rejected this API key. Check the key and that the three APIs are enabled, then save it again in Settings.';
   setStatus(msg, true);
   try {
     $('settingsStatus').textContent = msg; $('settingsStatus').classList.add('err');
@@ -518,12 +529,48 @@ async function timesFrom(person, destinations) {
   return out;
 }
 
+/* ---------- shared-key allowance ---------- */
+// With the shared key, each search first asks the site's counter for permission, so the
+// host's free Google allowance is not exceeded. Without a counter, shared searches are refused.
+async function allowSearch(request, showStatus) {
+  if (!usingShared()) return true;
+  const tooMany = 'The free searches on the shared key are used up for now. ' +
+    'Add your own Google Maps key in Settings to keep searching.';
+  if (!QUOTA_URL) { showStatus(tooMany, true); return false; }
+  try {
+    const res = await fetch(QUOTA_URL, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request), cache: 'no-store',
+    });
+    const data = await res.json();
+    if (data.ok) return true;
+    showStatus(data.message || tooMany, true);
+  } catch (e) {
+    console.warn('Allowance check failed', e);
+    showStatus("Couldn't check the shared key's allowance. Try again in a moment, or add your own key in Settings.", true);
+  }
+  return false;
+}
+
+async function allowanceText() {
+  if (!usingShared() || !QUOTA_URL) return '';
+  try {
+    const data = await (await fetch(QUOTA_URL, { cache: 'no-store' })).json();
+    return data.summary || '';
+  } catch { return ''; }
+}
+
 /* ---------- the search ---------- */
 async function findMiddle() {
   const { A, B } = state;
   if (!A.loc || !B.loc) { setStatus('Pick both starting points first.', true); return; }
   const query = $('venue').value.trim() || 'cafe';
+  const driving = A.mode === 'DRIVING' || B.mode === 'DRIVING';
   $('goBtn').disabled = true;
+  if (!await allowSearch({ app: 'meet', driving, traffic: driving && !!departure() }, setStatus)) {
+    $('goBtn').disabled = false;
+    return;
+  }
   $('results').innerHTML = '';
   clearMarkers();
 
@@ -538,8 +585,9 @@ async function findMiddle() {
     // Stage 1: probe a grid across the corridor between A and B.
     setStatus('Mapping travel times across the area…');
     const grid = [];
-    const along = [0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85];
-    const across = [-0.3, -0.15, 0, 0.15, 0.3];
+    // 15 probes keeps each search to ~78 journey-time lookups (Google bills each one).
+    const along = [0.2, 0.35, 0.5, 0.65, 0.8];
+    const across = [-0.2, 0, 0.2];
     for (const t of along) for (const s of across) {
       grid.push(P.toLL({
         x: a.x + (b.x - a.x) * t + perp.x * s * D,
@@ -571,7 +619,7 @@ async function findMiddle() {
         textQuery: query,
         fields: ['id', 'displayName', 'location', 'formattedAddress', 'rating', 'userRatingCount'],
         locationBias: { center: h.p, radius },
-        maxResultCount: 15,
+        maxResultCount: 8,
       }).catch(() => ({ places: [] }))
     ));
     for (const { places } of searches) {
@@ -579,7 +627,7 @@ async function findMiddle() {
         if (pl.location && !seen.has(pl.id)) seen.set(pl.id, pl);
       }
     }
-    const venues = [...seen.values()].slice(0, 45);
+    const venues = [...seen.values()].slice(0, 24);
     if (!venues.length) throw new Error(`Couldn't find any "${query}" near the middle. Try a broader type.`);
 
     // Stage 3: real journey times to each venue, then rank.
@@ -769,8 +817,9 @@ function walkSettings() {
 }
 
 // Search for a kind of place around a point. Returns [{ id, name, address, rating, count, ll, ev }]
-async function searchKind(kind, center, radius, max) {
-  const fields = ['id', 'displayName', 'location', 'formattedAddress', 'rating', 'userRatingCount'];
+async function searchKind(kind, center, radius, max, withRating = true) {
+  const fields = ['id', 'displayName', 'location', 'formattedAddress'];
+  if (withRating) fields.push('rating', 'userRatingCount');
   if (isEV(kind)) fields.push('evChargeOptions');
   let places = [];
   if (kind.type) {
@@ -815,9 +864,9 @@ async function walkTimes(origin, dests) {
 }
 
 // For one place, find walkable neighbours of `kind`, sorted by walk time, within max minutes.
-async function neighbours(origin, kind, maxMin, excludeId) {
+async function neighbours(origin, kind, maxMin, excludeId, max = 20, withRating = true) {
   const radius = maxMin * 100;    // generous straight-line radius (~6 km/h), real walk times filter after
-  const cands = (await searchKind(kind, origin, radius, 20)).filter((c) => c.id !== excludeId);
+  const cands = (await searchKind(kind, origin, radius, max, withRating)).filter((c) => c.id !== excludeId);
   const times = await walkTimes(origin, cands.map((c) => c.ll));
   return cands
     .map((c, i) => ({ ...c, walk: times[i] }))
@@ -839,6 +888,11 @@ async function findPairs() {
   $('pairResults').innerHTML = '';
   clearPairMarkers(true);
   $('pairBtn').disabled = true;
+  const request = pair.mode === 'anchor'
+    ? { app: 'pair', mode: 'anchor', ev: isEV(kindOf($('kindFind').value || 'EV charger')) }
+    : { app: 'pair', mode: 'both', ev: isEV(kindOf($('kindNear').value || 'EV charger')), mainEv: isEV(kindOf($('kindMain').value || 'hotel')) };
+  const ready = pair.mode === 'anchor' ? pair.anchor : pair.area;
+  if (ready && !await allowSearch(request, pairSetStatus)) { $('pairBtn').disabled = false; return; }
   try {
     if (pair.mode === 'anchor') {
       if (!pair.anchor) throw new Error('Pick your place first.');
@@ -854,11 +908,11 @@ async function findPairs() {
       const kNear = kindOf($('kindNear').value || 'EV charger');
       const radius = Number($('areaRadius').value) || 3000;
       pairSetStatus(`Finding ${kMain.label.toLowerCase()}s in the area…`);
-      const mains = (await searchKind(kMain, pair.area.loc, radius, 20)).slice(0, 12);
+      const mains = (await searchKind(kMain, pair.area.loc, radius, 20)).slice(0, 8);
       if (!mains.length) throw new Error(`No ${kMain.label.toLowerCase()} found there. Try a bigger area.`);
       pairSetStatus(`Checking what's within ${max} min walk of ${mains.length} ${kMain.label.toLowerCase()}s…`);
       const withNear = await Promise.all(mains.map(async (m) => {
-        try { return { ...m, near: await neighbours(m.ll, kNear, max, m.id) }; }
+        try { return { ...m, near: await neighbours(m.ll, kNear, max, m.id, 10, false) }; }
         catch (e) { console.warn(e); return { ...m, near: [] }; }
       }));
       const hits = withNear.filter((m) => m.near.length)
@@ -1066,11 +1120,15 @@ function settingsMsg(msg, err = false) {
 }
 
 function refreshSettings() {
-  const k = getKey();
+  const k = ownKey();
   $('setKeyInput').value = k || '';
   $('setKeyInput').type = 'password'; $('setKeyShow').textContent = 'Show';
-  $('setKeyHint').textContent = k ? `Current key: ${maskKey(k)}` : 'No key saved.';
+  $('setKeyHint').textContent = k ? `Your key: ${maskKey(k)}`
+    : SHARED_KEY ? 'Using the shared key, which allows a limited number of searches. Add your own key for unlimited use.'
+    : 'No key saved.';
   $('setKeyHint').classList.toggle('ok', !!k);
+  $('setKeyRemove').classList.toggle('hidden', !k);
+  if (!k && SHARED_KEY) allowanceText().then((t) => { if (t && !ownKey()) $('setKeyHint').textContent += ' ' + t; });
   const n = savedPlaces.length;
   $('setDataInfo').textContent = `${n} saved place${n === 1 ? '' : 's'}${n ? ': ' + savedPlaces.map((s) => s.label).join(', ') : ''}. Names, travel modes and search settings are also remembered.`;
 }
@@ -1089,14 +1147,15 @@ function initSettings() {
     const k = $('setKeyInput').value.trim();
     if (!k) return settingsMsg('Paste a key first.', true);
     if (!/^AIza[\w-]{30,}$/.test(k) && !confirm("That doesn't look like a Google Maps key (they usually start with AIza). Save it anyway?")) return;
-    if (k === getKey()) return settingsMsg('That key is already saved.');
+    if (k === ownKey()) return settingsMsg('That key is already saved.');
     setKey(k);
     settingsMsg('Saved. Reloading…');
     setTimeout(() => location.reload(), 300);
   });
   $('setKeyInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('setKeySave').click(); });
   $('setKeyRemove').addEventListener('click', () => {
-    if (!confirm('Remove the API key from this browser? You will need to paste it again to use the app.')) return;
+    if (!confirm(SHARED_KEY ? 'Remove your API key from this browser? The app will go back to the shared key.'
+      : 'Remove the API key from this browser? You will need to paste it again to use the app.')) return;
     clearKey(); location.reload();
   });
   $('setClearSaved').addEventListener('click', () => {

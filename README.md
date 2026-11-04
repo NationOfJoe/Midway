@@ -42,6 +42,25 @@ On the web the page is published twice, each locked to one feature by a flag on 
 Both share the API key and saved places when served from the same site. The Pages build
 writes them to `meet/` and `pair/`.
 
+### Offering a shared key
+
+A host can let visitors search without their own key by adding two tags to the page's `<head>`:
+
+```html
+<meta name="midway-shared-key" content="AIza…">
+<meta name="midway-quota-url" content="/apps/midway-quota/quota.cgi">
+```
+
+Before each search on the shared key the page asks `web/quota.cgi` (a small Python CGI) for
+permission. It knows the most each search can cost in each Google SKU and stops at 90% of the
+monthly free allowance, with no single day using more than a quarter of that. Usage is kept
+in `private/midway-usage.json`, two folders above the script. A key the visitor saves in
+Settings always takes priority and is not counted. Keep the key itself out of this repo.
+
+Per search, at most: Midway 78 journey-time elements and 3 place searches (plus 8 parking
+searches when someone drives); Nearby Pair 9 place searches and 80 walking elements
+("Find both"), or 1 search and 20 elements ("I have a place").
+
 ## Updating the web app
 
 Replace `app/src/main/assets/index.html` with a newer `midway.html` and rebuild.
