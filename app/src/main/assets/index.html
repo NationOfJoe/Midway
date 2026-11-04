@@ -320,6 +320,25 @@ function clearKey() { try { localStorage.removeItem(KEY_STORE); } catch {} }
 
 const $ = (id) => document.getElementById(id);
 
+/* ---------- single-app mode ----------
+   With no flag this page is the combined app (the Android build). The web build
+   publishes it twice, as two apps sharing one browser key and saved places:
+   <html data-app="Meet"> is Midway, <html data-app="Pair"> is Nearby Pair. */
+const ONLY = { Meet: 'Meet', Pair: 'Pair' }[document.documentElement.dataset.app] || null;
+const APP = {
+  Meet: { name: 'Midway', tag: "Find a meeting spot that's fair in travel time, not distance." },
+  Pair: { name: 'Nearby Pair', tag: 'Find a place with another kind of place a short walk away.' },
+};
+(function applySingleApp() {
+  if (!ONLY) return;
+  const a = APP[ONLY];
+  document.title = a.name;
+  document.querySelectorAll('h1').forEach((h) => { h.textContent = a.name; });
+  const keyTag = document.querySelector('#keyScreen .tag');
+  if (keyTag) keyTag.textContent = a.tag;
+  $('tabBtn' + (ONLY === 'Meet' ? 'Pair' : 'Meet')).classList.add('hidden');
+})();
+
 function loadMaps(key) {
   // Google's official dynamic bootstrap loader
   (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({ key, v: "weekly" });
@@ -965,6 +984,7 @@ function setPairMode(m) {
 
 function setTab(t) {
   if (!['Meet', 'Pair', 'Settings'].includes(t)) t = 'Meet';
+  if (ONLY && t !== 'Settings') t = ONLY;
   for (const x of ['Meet', 'Pair', 'Settings']) {
     $('tab' + x).classList.toggle('hidden', x !== t);
     $('tabBtn' + x).setAttribute('aria-selected', String(x === t));
@@ -1157,7 +1177,7 @@ async function initApp() {
     input.parentElement.querySelector('.edit').addEventListener('click', () => { input.focus(); input.select(); });
     $('save' + p).addEventListener('click', () => saveCurrent(p));
     if (prefs[p]?.mode) setMode(p, prefs[p].mode);
-    if (prefs[p]?.loc) setOrigin(p, prefs[p].loc, prefs[p].label || 'Last used');
+    if (prefs[p]?.loc && ONLY !== 'Pair') setOrigin(p, prefs[p].loc, prefs[p].label || 'Last used');
   }
   refreshNames();
   renderSaved();

@@ -40,6 +40,11 @@ jobs:
           cp app/build/outputs/apk/debug/app-debug.apk _site/midway.apk
           mkdir -p _site/app
           cp app/src/main/assets/index.html _site/app/index.html
+          # The two web apps: the same page, each locked to one feature.
+          mkdir -p _site/meet _site/pair
+          sed 's/<html lang="en">/<html lang="en" data-app="Meet">/' app/src/main/assets/index.html > _site/meet/index.html
+          sed -e 's/<html lang="en">/<html lang="en" data-app="Pair">/' -e 's|<title>Midway</title>|<title>Nearby Pair</title>|' \
+              app/src/main/assets/index.html > _site/pair/index.html
           sed -e "s/__VERSION__/${version}/g" \
               -e "s/__DATE__/$(date -u +'%Y-%m-%d %H:%M UTC')/g" \
               -e "s/__SHA__/${GITHUB_SHA::7}/g" \

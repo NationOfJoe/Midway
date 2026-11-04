@@ -31,6 +31,17 @@ https://nationofjoe.github.io/Midway/*
 
 The key needs Maps JavaScript API, Places API (New) and Routes API enabled.
 
+## Web apps
+
+On the web the page is published twice, each locked to one feature by a flag on its
+`<html>` tag (the Android app has no flag and keeps both tabs):
+
+- `data-app="Meet"`: **Midway**, meet halfway.
+- `data-app="Pair"`: **Nearby Pair**, a place with another kind of place a short walk away.
+
+Both share the API key and saved places when served from the same site. The Pages build
+writes them to `meet/` and `pair/`.
+
 ## Updating the web app
 
 Replace `app/src/main/assets/index.html` with a newer `midway.html` and rebuild.
