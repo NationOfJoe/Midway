@@ -40,7 +40,11 @@ def cost(req):
     """Most a search can use, per SKU. Mirrors findMiddle() and findPairs() in the page."""
     app = req.get('app')
     if app == 'meet':
-        c = {'routesPro' if req.get('traffic') else 'routes': 78,  # 2 people x (15 probes + 24 venues)
+        try:
+            people = min(5, max(2, int(req.get('people') or 2)))
+        except (TypeError, ValueError):
+            people = 2
+        c = {'routesPro' if req.get('traffic') else 'routes': 39 * people,  # people x (15 probes + 24 venues)
              'placesEnterprise': 3}                                   # 3 venue searches with ratings
         if req.get('driving'):
             c['placesPro'] = 8                                        # parking near each of 8 results

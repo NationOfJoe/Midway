@@ -57,7 +57,13 @@
   .who { display: flex; align-items: center; gap: 8px; font-weight: 600; margin-bottom: 8px; }
   .dot { width: 22px; height: 22px; border-radius: 50%; color: #fff; display: grid; place-items: center;
     font-size: 12px; font-weight: 700; flex: none; }
-  .dot.a { background: var(--a); } .dot.b { background: var(--b); }
+  .dot.a { background: #2563eb; } .dot.b { background: #db2777; } .dot.c { background: #d97706; }
+  .dot.d { background: #7c3aed; } .dot.e { background: #059669; }
+  .who .rm { margin-left: auto; border: 0; background: none; color: var(--muted); font: inherit; font-size: 18px;
+    line-height: 1; padding: 0 2px; cursor: pointer; }
+  .who .rm:hover { color: #dc2626; }
+  .addp { width: 100%; padding: 10px; margin: 0 0 12px; border: 1px dashed var(--border); border-radius: var(--radius);
+    background: transparent; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
   .picked { font-size: 13px; color: var(--muted); margin-top: 6px; min-height: 18px; }
   .picked.ok { color: var(--good); }
   .seg { display: flex; background: var(--surface-2); border-radius: 10px; padding: 3px; margin-top: 10px; }
@@ -158,39 +164,8 @@
     </div>
 
     <section id="tabMeet">
-    <div class="card" id="cardA">
-      <div class="who"><span class="dot a" id="dotA">A</span>
-        <input class="name-input" id="nameA" value="Person A" maxlength="24" aria-label="Name for person A">
-        <span class="edit">✎</span></div>
-      <div id="acA"></div>
-      <div class="saved" id="savedA"></div>
-      <div class="card-actions">
-        <button class="linkbtn" id="locA">Use my location</button>
-        <button class="linkbtn hidden" id="saveA">☆ Save this place</button>
-      </div>
-      <div class="picked" id="pickedA"></div>
-      <div class="seg" role="group" aria-label="Person A travel mode">
-        <button data-p="A" data-m="TRANSIT" aria-pressed="true">Public transport</button>
-        <button data-p="A" data-m="DRIVING" aria-pressed="false">Car</button>
-      </div>
-    </div>
-
-    <div class="card" id="cardB">
-      <div class="who"><span class="dot b" id="dotB">B</span>
-        <input class="name-input" id="nameB" value="Person B" maxlength="24" aria-label="Name for person B">
-        <span class="edit">✎</span></div>
-      <div id="acB"></div>
-      <div class="saved" id="savedB"></div>
-      <div class="card-actions">
-        <button class="linkbtn" id="locB">Use my location</button>
-        <button class="linkbtn hidden" id="saveB">☆ Save this place</button>
-      </div>
-      <div class="picked" id="pickedB"></div>
-      <div class="seg" role="group" aria-label="Person B travel mode">
-        <button data-p="B" data-m="TRANSIT" aria-pressed="true">Public transport</button>
-        <button data-p="B" data-m="DRIVING" aria-pressed="false">Car</button>
-      </div>
-    </div>
+    <div id="people"></div>
+    <button class="addp" id="addPerson">+ Add person</button>
 
     <div class="card">
       <label class="lbl" for="venue">Meet at</label>
@@ -315,8 +290,6 @@
 /* ---------- key handling ---------- */
 const KEY_STORE = 'midway.apiKey';
 /* A site can offer a shared key (and a searches allowance) by adding
-   <meta name="midway-shared-key" content="AIza…"> and
-   <meta name="midway-quota-url" content="/path/to/quota.cgi"> to the page.
    A key the visitor saves in Settings always takes priority and has no allowance. */
 const metaContent = (n) => document.querySelector(`meta[name="${n}"]`)?.content?.trim() || null;
 const SHARED_KEY = metaContent('midway-shared-key');
@@ -367,10 +340,14 @@ window.gm_authFailure = () => {
 };
 
 /* ---------- state ---------- */
-const state = {
-  A: { loc: null, label: '', mode: 'TRANSIT', name: 'Person A' },
-  B: { loc: null, label: '', mode: 'TRANSIT', name: 'Person B' },
-};
+// Up to five people. Letters are stable ids; the dot shows the name's initial.
+const LETTERS = ['A', 'B', 'C', 'D', 'E'];
+const MIN_PEOPLE = 2, MAX_PEOPLE = LETTERS.length;
+const COLORS = { A: '#2563eb', B: '#db2777', C: '#d97706', D: '#7c3aed', E: '#059669' };
+const newPerson = (p) => ({ loc: null, label: '', mode: 'TRANSIT', name: `Person ${p}` });
+const state = Object.fromEntries(LETTERS.map((p) => [p, newPerson(p)]));
+let people = ['A', 'B'];   // letters currently in use, in display order
+const active = () => people.map((p) => state[p]);
 let G = {};            // loaded library classes
 let map, markers = [], infoWin, parkMarker = null;
 
@@ -380,14 +357,14 @@ function loadJSON(k, def) { try { return JSON.parse(localStorage.getItem(k)) ?? 
 function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
 function savePrefs() {
   const pick = (p) => ({ name: state[p].name, mode: state[p].mode, loc: state[p].loc, label: state[p].label });
-  saveJSON(PREFS, { A: pick('A'), B: pick('B') });
+  saveJSON(PREFS, { people, ...Object.fromEntries(people.map((p) => [p, pick(p)])) });
 }
 let savedPlaces = loadJSON(SAVED, []);   // [{ id, label, address, lat, lng }]
 
 const nameOf = (p) => state[p].name.trim() || `Person ${p}`;
-const initial = (p) => (nameOf(p).match(/\p{L}|\d/u)?.[0] || p).toUpperCase();
+const initial = (p) => nameOf(p) === `Person ${p}` ? p : (nameOf(p).match(/\p{L}|\d/u)?.[0] || p).toUpperCase();
 function refreshNames() {
-  for (const p of ['A', 'B']) {
+  for (const p of people) {
     $('dot' + p).textContent = initial(p);
     if (state['origin' + p]) state['origin' + p].title = nameOf(p);
   }
@@ -396,16 +373,95 @@ function refreshNames() {
 const sameLoc = (a, b) => a && b && Math.abs(a.lat - b.lat) < 1e-6 && Math.abs(a.lng - b.lng) < 1e-6;
 const savedLabel = (s) => `${s.label}${s.address ? ' · ' + s.address : ''}`;
 // Every place-picker that shows saved chips: { box id, current location getter, pick handler }
-const savedTargets = [
-  { box: 'savedA', loc: () => state.A.loc, pick: (s) => setOrigin('A', { lat: s.lat, lng: s.lng }, savedLabel(s)) },
-  { box: 'savedB', loc: () => state.B.loc, pick: (s) => setOrigin('B', { lat: s.lat, lng: s.lng }, savedLabel(s)) },
+const savedTargets = () => [
+  ...people.map((p) => ({ box: 'saved' + p, loc: () => state[p].loc, pick: (s) => setOrigin(p, { lat: s.lat, lng: s.lng }, savedLabel(s)) })),
   { box: 'savedArea', loc: () => pair.area?.loc, pick: (s) => setPairLoc('area', { lat: s.lat, lng: s.lng }, savedLabel(s)) },
   { box: 'savedAnchor', loc: () => pair.anchor?.loc, pick: (s) => setPairLoc('anchor', { lat: s.lat, lng: s.lng }, savedLabel(s)) },
 ];
 
+/* ---------- person cards ---------- */
+function buildCard(p) {
+  const card = document.createElement('div');
+  card.className = 'card'; card.id = 'card' + p;
+  card.innerHTML = `
+    <div class="who"><span class="dot ${p.toLowerCase()}" id="dot${p}">${p}</span>
+      <input class="name-input" id="name${p}" maxlength="24" aria-label="Name for person ${p}">
+      <span class="edit">✎</span>
+      <button class="rm" id="rm${p}" aria-label="Remove this person" title="Remove">×</button></div>
+    <div id="ac${p}"></div>
+    <div class="saved" id="saved${p}"></div>
+    <div class="card-actions">
+      <button class="linkbtn" id="loc${p}">Use my location</button>
+      <button class="linkbtn hidden" id="save${p}">☆ Save this place</button>
+    </div>
+    <div class="picked" id="picked${p}"></div>
+    <div class="seg" role="group" aria-label="Travel mode">
+      <button data-p="${p}" data-m="TRANSIT" aria-pressed="true">Public transport</button>
+      <button data-p="${p}" data-m="DRIVING" aria-pressed="false">Car</button>
+    </div>`;
+  $('people').appendChild(card);
+
+  const input = $('name' + p);
+  input.value = state[p].name;
+  input.addEventListener('input', () => { state[p].name = input.value; refreshNames(); savePrefs(); });
+  input.addEventListener('blur', () => { if (!input.value.trim()) { input.value = state[p].name = `Person ${p}`; refreshNames(); savePrefs(); } });
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+  card.querySelector('.edit').addEventListener('click', () => { input.focus(); input.select(); });
+
+  const ac = new G.PlaceAutocompleteElement({});
+  ac.placeholder = `Where is ${p === 'A' ? 'the first person' : 'this person'} starting?`;
+  $('ac' + p).appendChild(ac);
+  ac.addEventListener('gmp-select', async ({ placePrediction }) => {
+    const place = placePrediction.toPlace();
+    await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] });
+    setOrigin(p, { lat: place.location.lat(), lng: place.location.lng() }, place.displayName || place.formattedAddress);
+  });
+  $('loc' + p).addEventListener('click', () => {
+    if (!navigator.geolocation) return setStatus('Location not available in this browser.', true);
+    $('picked' + p).textContent = 'Finding you…';
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setOrigin(p, { lat: pos.coords.latitude, lng: pos.coords.longitude }, 'Current location'),
+      () => { $('picked' + p).textContent = ''; setStatus("Couldn't get your location.", true); },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  });
+  $('save' + p).addEventListener('click', () => saveCurrent(p));
+  $('rm' + p).addEventListener('click', () => removePerson(p));
+  card.querySelectorAll('.seg button').forEach((btn) => btn.addEventListener('click', () => setMode(p, btn.dataset.m)));
+  setMode(p, state[p].mode, false);
+  if (state[p].loc) setOrigin(p, state[p].loc, state[p].label || 'Last used', false);
+}
+
+function refreshPeopleUI() {
+  $('addPerson').classList.toggle('hidden', people.length >= MAX_PEOPLE);
+  for (const p of people) $('rm' + p).classList.toggle('hidden', people.length <= MIN_PEOPLE);
+  $('goBtn').textContent = people.length > 2 ? `Find the fair middle for ${people.length}` : 'Find the fair middle';
+}
+
+function addPerson() {
+  const p = LETTERS.find((l) => !people.includes(l));
+  if (!p || people.length >= MAX_PEOPLE) return;
+  state[p] = newPerson(p);
+  people.push(p);
+  buildCard(p);
+  refreshNames(); refreshPeopleUI(); renderSaved(); savePrefs();
+  $('name' + p).focus(); $('name' + p).select();
+}
+
+function removePerson(p) {
+  if (people.length <= MIN_PEOPLE) return;
+  people = people.filter((x) => x !== p);
+  if (state['origin' + p]) { state['origin' + p].map = null; state['origin' + p] = null; }
+  $('card' + p).remove();
+  state[p] = newPerson(p);
+  $('results').innerHTML = ''; clearMarkers(); setStatus('');
+  refreshPeopleUI(); savePrefs(); fitOrigins();
+}
+
 function renderSaved() {
-  for (const t of savedTargets) {
+  for (const t of savedTargets()) {
     const box = $(t.box);
+    if (!box) continue;   // a card that is still being built
     box.innerHTML = '';
     for (const s of savedPlaces) {
       const chip = document.createElement('span');
@@ -438,10 +494,10 @@ function saveCurrent(p) {
   saveJSON(SAVED, savedPlaces); renderSaved();
 }
 
-function setMode(p, m) {
+function setMode(p, m, persist = true) {
   state[p].mode = m;
   document.querySelectorAll(`.seg button[data-p="${p}"]`).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.m === m)));
-  savePrefs();
+  if (persist) savePrefs();
 }
 
 /* ---------- parking ---------- */
@@ -484,8 +540,10 @@ function project(origin) {
 }
 
 /* ---------- scoring ---------- */
-// Lower is better: the longer journey, plus half the imbalance between the two.
-const score = (ta, tb) => Math.max(ta, tb) + 0.5 * Math.abs(ta - tb);
+// Lower is better: the longest journey, plus half the gap between the fastest and slowest.
+// With two people this is the longer journey plus half their difference.
+const spread = (ts) => Math.max(...ts) - Math.min(...ts);
+const score = (ts) => Math.max(...ts) + 0.5 * spread(ts);
 const fmtMin = (ms) => {
   const m = Math.round(ms / 60000);
   return m < 60 ? `${m} min` : `${Math.floor(m/60)}h ${String(m%60).padStart(2,'0')}m`;
@@ -561,13 +619,57 @@ async function allowanceText() {
 }
 
 /* ---------- the search ---------- */
+// Probe points to sample travel times over. At most 15, so each search stays at
+// (15 probes + 24 venues) journey-time lookups per person (Google bills each one).
+function probeGrid(locs) {
+  const n = locs.length;
+  const mid = { lat: locs.reduce((s, l) => s + l.lat, 0) / n, lng: locs.reduce((s, l) => s + l.lng, 0) / n };
+  const P = project(mid);
+  const xy = locs.map(P.toXY);
+  const grid = [];
+  if (n === 2) {
+    // Two people: a grid across the corridor between them.
+    const [a, b] = xy;
+    const D = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const perp = { x: -(b.y - a.y) / D, y: (b.x - a.x) / D };
+    for (const t of [0.2, 0.35, 0.5, 0.65, 0.8]) for (const s of [-0.2, 0, 0.2]) {
+      grid.push(P.toLL({ x: a.x + (b.x - a.x) * t + perp.x * s * D, y: a.y + (b.y - a.y) * t + perp.y * s * D }));
+    }
+    return grid;
+  }
+  // Three or more: the centre of the group, points part-way out towards each person,
+  // and points between neighbouring people (going round the centre).
+  const c = { x: 0, y: 0 };
+  const pts = [{ ...c, r: 0 }];
+  for (const t of [0.3, 0.6]) for (const v of xy) pts.push({ x: v.x * t, y: v.y * t, r: t });
+  const around = xy.map((v) => ({ v, ang: Math.atan2(v.y, v.x) })).sort((a, b) => a.ang - b.ang);
+  around.forEach(({ v }, i) => {
+    const w = around[(i + 1) % around.length].v;
+    pts.push({ x: (v.x + w.x) * 0.25, y: (v.y + w.y) * 0.25, r: 0.45 });
+  });
+  pts.sort((a, b) => a.r - b.r);   // keep the ones nearest the centre if there are too many
+  return pts.slice(0, 15).map(P.toLL);
+}
+
+// Largest distance between any two people (sets search radii and hotspot spacing).
+function groupSpan(locs) {
+  let D = 0;
+  for (let i = 0; i < locs.length; i++) for (let j = i + 1; j < locs.length; j++) D = Math.max(D, haversine(locs[i], locs[j]));
+  return D;
+}
+
 async function findMiddle() {
-  const { A, B } = state;
-  if (!A.loc || !B.loc) { setStatus('Pick both starting points first.', true); return; }
+  const ps = active();
+  const missing = people.filter((p) => !state[p].loc);
+  if (missing.length) {
+    setStatus(ps.length === 2 ? 'Pick both starting points first.'
+      : `Pick a starting point for ${missing.map(nameOf).join(', ')} first.`, true);
+    return;
+  }
   const query = $('venue').value.trim() || 'cafe';
-  const driving = A.mode === 'DRIVING' || B.mode === 'DRIVING';
+  const driving = ps.some((x) => x.mode === 'DRIVING');
   $('goBtn').disabled = true;
-  if (!await allowSearch({ app: 'meet', driving, traffic: driving && !!departure() }, setStatus)) {
+  if (!await allowSearch({ app: 'meet', people: ps.length, driving, traffic: driving && !!departure() }, setStatus)) {
     $('goBtn').disabled = false;
     return;
   }
@@ -575,30 +677,17 @@ async function findMiddle() {
   clearMarkers();
 
   try {
-    const D = haversine(A.loc, B.loc);
-    const mid = { lat: (A.loc.lat + B.loc.lat) / 2, lng: (A.loc.lng + B.loc.lng) / 2 };
-    const P = project(mid);
-    const a = P.toXY(A.loc), b = P.toXY(B.loc);
-    const dir = { x: (b.x - a.x) / (D || 1), y: (b.y - a.y) / (D || 1) };
-    const perp = { x: -dir.y, y: dir.x };
+    const locs = ps.map((x) => x.loc);
+    const D = groupSpan(locs);
 
-    // Stage 1: probe a grid across the corridor between A and B.
+    // Stage 1: probe travel times across the area between everyone.
     setStatus('Mapping travel times across the area…');
-    const grid = [];
-    // 15 probes keeps each search to ~78 journey-time lookups (Google bills each one).
-    const along = [0.2, 0.35, 0.5, 0.65, 0.8];
-    const across = [-0.2, 0, 0.2];
-    for (const t of along) for (const s of across) {
-      grid.push(P.toLL({
-        x: a.x + (b.x - a.x) * t + perp.x * s * D,
-        y: a.y + (b.y - a.y) * t + perp.y * s * D,
-      }));
-    }
-    const [gA, gB] = await Promise.all([timesFrom(A, grid), timesFrom(B, grid)]);
+    const grid = probeGrid(locs);
+    const gT = await Promise.all(ps.map((x) => timesFrom(x, grid)));
     const scoredGrid = grid
-      .map((p, i) => ({ p, ta: gA[i], tb: gB[i] }))
-      .filter((g) => g.ta != null && g.tb != null)
-      .map((g) => ({ ...g, s: score(g.ta, g.tb) }))
+      .map((p, i) => ({ p, ts: gT.map((t) => t[i]) }))
+      .filter((g) => g.ts.every((t) => t != null))
+      .map((g) => ({ ...g, s: score(g.ts) }))
       .sort((x, y) => x.s - y.s);
     if (!scoredGrid.length) throw new Error('No routes found between these places in the chosen modes.');
 
@@ -633,17 +722,17 @@ async function findMiddle() {
     // Stage 3: real journey times to each venue, then rank.
     setStatus(`Checking journey times to ${venues.length} places…`);
     const dests = venues.map((v) => ({ lat: v.location.lat(), lng: v.location.lng() }));
-    const [vA, vB] = await Promise.all([timesFrom(A, dests), timesFrom(B, dests)]);
+    const vT = await Promise.all(ps.map((x) => timesFrom(x, dests)));
     const ranked = venues
-      .map((v, i) => ({ v, ll: dests[i], ta: vA[i], tb: vB[i] }))
-      .filter((r) => r.ta != null && r.tb != null)
-      .map((r) => ({ ...r, s: score(r.ta, r.tb) }))
+      .map((v, i) => ({ v, ll: dests[i], ts: vT.map((t) => t[i]) }))
+      .filter((r) => r.ts.every((t) => t != null))
+      .map((r) => ({ ...r, s: score(r.ts) }))
       .sort((x, y) => x.s - y.s)
       .slice(0, 8);
-    if (!ranked.length) throw new Error('Found places, but no routes to them. Try different modes or a time.');
+    if (!ranked.length) throw new Error('Found places, but no routes to them for everyone. Try different modes or a time.');
 
     // Stage 4: nearest parking for anyone driving.
-    if (A.mode === 'DRIVING' || B.mode === 'DRIVING') {
+    if (driving) {
       setStatus('Finding parking near each place…');
       await Promise.all(ranked.map(async (r) => { r.parking = await findParking(r.ll); }));
     }
@@ -678,25 +767,25 @@ function render(ranked) {
   const box = $('results');
   box.innerHTML = '';
   const bounds = new G.LatLngBounds();
-  bounds.extend(state.A.loc); bounds.extend(state.B.loc);
+  for (const p of people) bounds.extend(state[p].loc);
 
   ranked.forEach((r, i) => {
-    const diff = Math.abs(r.ta - r.tb);
+    const diff = spread(r.ts);
     const el = document.createElement('div');
     el.className = 'result' + (i === 0 ? ' best' : '');
     el.tabIndex = 0;
+    const times = people.map((p, k) =>
+      `<span><span class="dot ${p.toLowerCase()}">${esc(initial(p))}</span>${esc(nameOf(p))}: ${fmtMin(r.ts[k])} ${state[p].mode === 'TRANSIT' ? 'by transit' : 'by car'}</span>`).join('');
+    const gapTxt = diff < 60000 ? 'Dead even'
+      : people.length === 2 ? `${fmtMin(diff)} difference` : `${fmtMin(diff)} between quickest and longest`;
     el.innerHTML = `
       <div class="name"><span class="rank">#${i + 1}</span>${esc(r.v.displayName)}</div>
       <div class="addr">${esc(r.v.formattedAddress)}${r.v.rating ? ` · ★ ${r.v.rating} (${r.v.userRatingCount ?? 0})` : ''}</div>
-      <div class="times">
-        <span><span class="dot a">${esc(initial('A'))}</span>${esc(nameOf('A'))}: ${fmtMin(r.ta)} ${state.A.mode === 'TRANSIT' ? 'by transit' : 'by car'}</span>
-        <span><span class="dot b">${esc(initial('B'))}</span>${esc(nameOf('B'))}: ${fmtMin(r.tb)} ${state.B.mode === 'TRANSIT' ? 'by transit' : 'by car'}</span>
-      </div>
-      <div class="gap ${diff < 5 * 60000 ? 'fair' : ''}">${diff < 60000 ? 'Dead even' : `${fmtMin(diff)} difference`}</div>
+      <div class="times">${times}</div>
+      <div class="gap ${diff < 5 * 60000 ? 'fair' : ''}">${gapTxt}</div>
       ${parkingLine(r)}
-      <div class="dirs">
-        <a href="${dirLink(state.A, r)}" target="_blank" rel="noopener">${esc(nameOf('A'))}'s directions</a>
-        <a href="${dirLink(state.B, r)}" target="_blank" rel="noopener">${esc(nameOf('B'))}'s directions</a>
+      <div class="dirs" style="flex-wrap:wrap">
+        ${people.map((p) => `<a href="${dirLink(state[p], r)}" target="_blank" rel="noopener">${esc(nameOf(p))}'s directions</a>`).join('')}
       </div>`;
     el.addEventListener('click', (ev) => {
       if (ev.target.closest('a')) return;
@@ -724,7 +813,7 @@ function render(ranked) {
 }
 
 function parkingLine(r) {
-  const drivers = ['A', 'B'].filter((p) => state[p].mode === 'DRIVING');
+  const drivers = people.filter((p) => state[p].mode === 'DRIVING');
   if (!drivers.length) return '';
   if (!r.parking) return `<div class="park"><span class="p">P</span><span class="muted">No parking found within 1 km</span></div>`;
   return `<div class="park"><span class="p">P</span>${esc(r.parking.name)} <span class="muted">· ~${r.parking.walkMin} min walk (${Math.round(r.parking.metres / 10) * 10} m)</span></div>`;
@@ -739,7 +828,7 @@ function showParking(r) {
 
 function openInfo(r, marker) {
   const park = r.parking ? `<br>🅿 ${esc(r.parking.name)} (~${r.parking.walkMin} min walk)` : '';
-  infoWin.setContent(`<div style="color:#111;font:14px system-ui"><b>${esc(r.v.displayName)}</b><br>${esc(nameOf('A'))}: ${fmtMin(r.ta)} · ${esc(nameOf('B'))}: ${fmtMin(r.tb)}${park}</div>`);
+  infoWin.setContent(`<div style="color:#111;font:14px system-ui"><b>${esc(r.v.displayName)}</b><br>${people.map((p, k) => `${esc(nameOf(p))}: ${fmtMin(r.ts[k])}`).join(' · ')}${park}</div>`);
   infoWin.open({ map, anchor: marker });
 }
 
@@ -753,23 +842,29 @@ function placeOrigin(p) {
   if (state[key]) state[key].map = null;
   if (!state[p].loc) return;
   const pin = new G.PinElement({
-    glyphText: initial(p), background: p === 'A' ? '#2563eb' : '#db2777',
+    glyphText: initial(p), background: COLORS[p],
     borderColor: '#ffffff', glyphColor: '#ffffff',
   });
   state[key] = new G.AdvancedMarkerElement({ map, position: state[p].loc, content: pin.element || pin, title: nameOf(p) });
-  if (state.A.loc && state.B.loc) {
-    const b = new G.LatLngBounds(); b.extend(state.A.loc); b.extend(state.B.loc); map.fitBounds(b, 60);
-  } else map.panTo(state[p].loc);
+  if (!fitOrigins()) map.panTo(state[p].loc);
 }
 
-function setOrigin(p, loc, label) {
+// Fit the map to everyone's starting point, once at least two are set.
+function fitOrigins() {
+  const locs = people.map((p) => state[p].loc).filter(Boolean);
+  if (locs.length < 2) return false;
+  const b = new G.LatLngBounds(); locs.forEach((l) => b.extend(l)); map.fitBounds(b, 60);
+  return true;
+}
+
+function setOrigin(p, loc, label, persist = true) {
   state[p].loc = loc; state[p].label = label;
   const el = $('picked' + p);
   el.textContent = '✓ ' + label; el.classList.add('ok');
   $('save' + p).classList.remove('hidden');
   placeOrigin(p);
   renderSaved();
-  savePrefs();
+  if (persist) savePrefs();
 }
 
 /* =====================================================================
@@ -1052,7 +1147,7 @@ function setTab(t) {
   // Each tab owns the map while it's showing.
   const meetOn = t === 'Meet';
   markers.forEach((m) => (m.map = meetOn ? map : null));
-  for (const p of ['A', 'B']) if (state['origin' + p]) state['origin' + p].map = meetOn ? map : null;
+  for (const p of people) if (state['origin' + p]) state['origin' + p].map = meetOn ? map : null;
   if (parkMarker) parkMarker.map = meetOn ? map : null;
   pair.markers.forEach((m) => (m.map = meetOn ? null : map));
   pair.lines.forEach((l) => l.setMap(meetOn ? null : map));
@@ -1199,45 +1294,20 @@ async function initApp() {
   });
   infoWin = new InfoWindow();
 
-  for (const p of ['A', 'B']) {
-    const ac = new G.PlaceAutocompleteElement({});
-    ac.placeholder = p === 'A' ? 'Where is A starting?' : 'Where is B starting?';
-    $('ac' + p).appendChild(ac);
-    ac.addEventListener('gmp-select', async ({ placePrediction }) => {
-      const place = placePrediction.toPlace();
-      await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] });
-      setOrigin(p, { lat: place.location.lat(), lng: place.location.lng() },
-        place.displayName || place.formattedAddress);
-    });
-
-    $('loc' + p).addEventListener('click', () => {
-      if (!navigator.geolocation) return setStatus('Location not available in this browser.', true);
-      $('picked' + p).textContent = 'Finding you…';
-      navigator.geolocation.getCurrentPosition(
-        (pos) => setOrigin(p, { lat: pos.coords.latitude, lng: pos.coords.longitude }, 'Current location'),
-        () => { $('picked' + p).textContent = ''; setStatus("Couldn't get your location.", true); },
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
-    });
-  }
-
-  document.querySelectorAll('.seg button').forEach((btn) => {
-    btn.addEventListener('click', () => setMode(btn.dataset.p, btn.dataset.m));
-  });
-
-  // Names, saved places, and last session
+  // People, names, modes and last picks from the previous session
   const prefs = loadJSON(PREFS, {});
-  for (const p of ['A', 'B']) {
-    const input = $('name' + p);
-    if (prefs[p]?.name) { state[p].name = prefs[p].name; input.value = prefs[p].name; }
-    input.addEventListener('input', () => { state[p].name = input.value; refreshNames(); savePrefs(); });
-    input.addEventListener('blur', () => { if (!input.value.trim()) { input.value = state[p].name = `Person ${p}`; refreshNames(); savePrefs(); } });
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
-    input.parentElement.querySelector('.edit').addEventListener('click', () => { input.focus(); input.select(); });
-    $('save' + p).addEventListener('click', () => saveCurrent(p));
-    if (prefs[p]?.mode) setMode(p, prefs[p].mode);
-    if (prefs[p]?.loc && ONLY !== 'Pair') setOrigin(p, prefs[p].loc, prefs[p].label || 'Last used');
+  const saved = Array.isArray(prefs.people) ? prefs.people.filter((p) => LETTERS.includes(p)) : [];
+  people = [...new Set(saved)].slice(0, MAX_PEOPLE);
+  if (people.length < MIN_PEOPLE) people = ['A', 'B'];
+  for (const p of people) {
+    const s = prefs[p] || {};
+    if (s.name) state[p].name = s.name;
+    if (s.mode === 'TRANSIT' || s.mode === 'DRIVING') state[p].mode = s.mode;
+    if (s.loc && ONLY !== 'Pair') { state[p].loc = s.loc; state[p].label = s.label || 'Last used'; }
+    buildCard(p);
   }
+  $('addPerson').addEventListener('click', addPerson);
+  refreshPeopleUI();
   refreshNames();
   renderSaved();
   initPairTab(G.PlaceAutocompleteElement);

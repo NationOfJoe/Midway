@@ -3,6 +3,7 @@
 Native Android shell (Kotlin) around the Midway web app in `app/src/main/assets/index.html`.
 
 - Meet halfway, Nearby pair and Settings all run from the bundled page.
+- Meet halfway finds a fair spot for 2 to 5 people.
 - "Use my location" asks for Android's location permission.
 - Directions links open in the Google Maps app.
 - Saved places, names and your API key stay on the phone (WebView storage).
@@ -57,7 +58,8 @@ monthly free allowance, with no single day using more than a quarter of that. Us
 in `private/midway-usage.json`, two folders above the script. A key the visitor saves in
 Settings always takes priority and is not counted. Keep the key itself out of this repo.
 
-Per search, at most: Midway 78 journey-time elements and 3 place searches (plus 8 parking
+Per search, at most: Midway 39 journey-time elements per person (2–5 people, so 78–195)
+and 3 place searches (plus 8 parking
 searches when someone drives); Nearby Pair 9 place searches and 80 walking elements
 ("Find both"), or 1 search and 20 elements ("I have a place").
 
